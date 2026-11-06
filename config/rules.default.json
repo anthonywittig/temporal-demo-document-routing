@@ -1,0 +1,15 @@
+{
+  "version": 1,
+  "businessUnits": {
+    "BU1": {
+      "humanReviewAbove": 5000,
+      "externalChecksFor": ["purchase-order"],
+      "default": "B"
+    },
+    "BU2": {
+      "humanReviewAbove": 1000,
+      "externalChecksFor": ["purchase-order", "contract"],
+      "default": "B"
+    }
+  }
+}

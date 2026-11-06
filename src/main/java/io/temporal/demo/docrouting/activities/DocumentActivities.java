@@ -1,0 +1,39 @@
+package io.temporal.demo.docrouting.activities;
+
+import io.temporal.activity.ActivityInterface;
+import io.temporal.demo.docrouting.workflow.DocumentRequest;
+import io.temporal.demo.docrouting.workflow.RoutingDecision;
+
+/**
+ * Every step that touches the outside world. Side-effecting calls send an Idempotency-Key of
+ * {@code <workflowId>/<activity type>}, which stays the same across retries and resets, so a
+ * repeat never causes a second effect.
+ */
+@ActivityInterface
+public interface DocumentActivities {
+
+  /** Returns the document type. */
+  String classify(DocumentRequest doc);
+
+  /** Reads the current routing rules; the decision, with its rules version, lands in history. */
+  RoutingDecision evaluateRules(DocumentRequest doc, String docType);
+
+  /** Path B. Returns the ERP's posting ID; the confirmation arrives later as a Signal. */
+  String postInvoiceToErp(DocumentRequest doc);
+
+  /** Path B and A: tell the requester the outcome. */
+  void notifyRequester(DocumentRequest doc, String message);
+
+  /** Path C: check the cost center. Fails without retry if it is unknown. */
+  void checkCostCenter(DocumentRequest doc);
+
+  void reserveBudget(DocumentRequest doc);
+
+  void releaseBudget(DocumentRequest doc);
+
+  /** Path C: send the purchase order to the supplier portal. Fails without retry if the supplier rejects it. */
+  void sendPurchaseOrder(DocumentRequest doc);
+
+  /** v2 only: archive the processed document. */
+  void archiveDocument(DocumentRequest doc);
+}

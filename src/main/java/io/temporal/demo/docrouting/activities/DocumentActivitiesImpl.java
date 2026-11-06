@@ -1,0 +1,111 @@
+package io.temporal.demo.docrouting.activities;
+
+import io.temporal.activity.Activity;
+import io.temporal.activity.ActivityInfo;
+import io.temporal.demo.docrouting.rules.RulesLoader;
+import io.temporal.demo.docrouting.workflow.DocumentRequest;
+import io.temporal.demo.docrouting.workflow.RoutingDecision;
+import io.temporal.failure.ApplicationFailure;
+import java.time.Duration;
+import java.util.LinkedHashMap;
+import java.util.Map;
+
+public class DocumentActivitiesImpl implements DocumentActivities {
+  private final String systemsUrl;
+  private final String webUrl;
+  private final RulesLoader rules;
+  private final Duration delay;
+  private final HttpCalls http = new HttpCalls();
+
+  /**
+   * @param systemsUrl where the mock systems run
+   * @param webUrl where the ERP sends its confirmation callback
+   * @param delay demo-only pause at the start of every activity, so steps are spaced out in the
+   *     Temporal UI timeline instead of landing on top of each other
+   */
+  public DocumentActivitiesImpl(String systemsUrl, String webUrl, RulesLoader rules, Duration delay) {
+    this.systemsUrl = systemsUrl;
+    this.webUrl = webUrl;
+    this.rules = rules;
+    this.delay = delay;
+  }
+
+  @Override
+  public String classify(DocumentRequest doc) {
+    pause();
+    // A stand-in for a real classifier: the scenario carries its type.
+    String type = doc.docType() == null || doc.docType().isBlank() ? "invoice" : doc.docType();
+    return type.toLowerCase();
+  }
+
+  @Override
+  public RoutingDecision evaluateRules(DocumentRequest doc, String docType) {
+    pause();
+    try {
+      return rules.evaluate(doc.businessUnit(), docType, doc.cost());
+    } catch (RulesLoader.UnknownBusinessUnitException e) {
+      throw ApplicationFailure.newNonRetryableFailure(e.getMessage(), HttpCalls.REJECTED);
+    }
+    // No valid rules at all (IllegalStateException) stays retryable: fixing the file fixes it.
+  }
+
+  @Override
+  public String postInvoiceToErp(DocumentRequest doc) {
+    return post("/erp/invoices", doc, Map.of("callbackUrl", webUrl + "/callbacks/erp"))
+        .path("postingId").asText();
+  }
+
+  @Override
+  public void notifyRequester(DocumentRequest doc, String message) {
+    post("/notify", doc, Map.of("detail", doc.requester() + ": " + message));
+  }
+
+  @Override
+  public void checkCostCenter(DocumentRequest doc) {
+    post("/cost-centers/check", doc, Map.of());
+  }
+
+  @Override
+  public void reserveBudget(DocumentRequest doc) {
+    post("/tasks/reserve-budget", doc, Map.of("detail", "$" + doc.cost() + " from " + doc.costCenter()));
+  }
+
+  @Override
+  public void releaseBudget(DocumentRequest doc) {
+    post("/tasks/reserve-budget/undo", doc, Map.of("detail", "$" + doc.cost() + " to " + doc.costCenter()));
+  }
+
+  @Override
+  public void sendPurchaseOrder(DocumentRequest doc) {
+    post("/supplier-portal/purchase-orders", doc, Map.of());
+  }
+
+  @Override
+  public void archiveDocument(DocumentRequest doc) {
+    post("/archive", doc, Map.of("detail", doc.documentId()));
+  }
+
+  private com.fasterxml.jackson.databind.JsonNode post(String path, DocumentRequest doc, Map<String, Object> extra) {
+    pause();
+    ActivityInfo info = Activity.getExecutionContext().getInfo();
+    Map<String, Object> body = new LinkedHashMap<>();
+    body.put("workflowId", info.getWorkflowId());
+    body.put("documentId", doc.documentId());
+    body.put("businessUnit", doc.businessUnit());
+    body.put("costCenter", doc.costCenter());
+    body.put("cost", doc.cost());
+    body.putAll(extra);
+    String idempotencyKey = info.getWorkflowId() + "/" + info.getActivityType();
+    return http.post(systemsUrl + path, body, idempotencyKey);
+  }
+
+  /** Demo-only: real systems take time, and spaced-out steps are easier to follow on screen. */
+  private void pause() {
+    if (delay.isZero()) return;
+    try {
+      Thread.sleep(delay.toMillis());
+    } catch (InterruptedException e) {
+      Thread.currentThread().interrupt();
+    }
+  }
+}
