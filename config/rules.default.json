@@ -2,14 +2,10 @@
   "version": 1,
   "businessUnits": {
     "Services": {
-      "humanReviewAbove": 5000,
-      "purchaseOrderFor": ["purchase-order"],
-      "default": "ErpPosting"
+      "humanReviewAbove": 5000
     },
     "Equipment": {
-      "humanReviewAbove": 1000,
-      "purchaseOrderFor": ["purchase-order"],
-      "default": "ErpPosting"
+      "humanReviewAbove": 1000
     }
   }
 }

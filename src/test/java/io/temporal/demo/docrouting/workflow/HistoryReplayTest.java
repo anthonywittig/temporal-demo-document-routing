@@ -38,7 +38,7 @@ class HistoryReplayTest {
   static final WorkflowSettings V1 = new WorkflowSettings(Duration.ofSeconds(60), Duration.ofMinutes(2), false);
 
   @ParameterizedTest
-  @ValueSource(strings = {"v1-human-review.json", "v1-erp-posting.json", "v1-purchase-order-rejected.json"})
+  @ValueSource(strings = {"v1-human-review.json", "v1-invoice.json", "v1-purchase-order-rejected.json"})
   void v1HistoriesReplayAgainstCurrentCode(String fixture) throws Exception {
     String json;
     try (InputStream in = getClass().getResourceAsStream("/histories/" + fixture)) {
@@ -60,7 +60,7 @@ class HistoryReplayTest {
   @Test
   void v2CodeCannotReplayV1History() throws Exception {
     String json;
-    try (InputStream in = getClass().getResourceAsStream("/histories/v1-erp-posting.json")) {
+    try (InputStream in = getClass().getResourceAsStream("/histories/v1-invoice.json")) {
       json = new String(in.readAllBytes(), StandardCharsets.UTF_8);
     }
     WorkflowSettings v2 = new WorkflowSettings(V1.slaDuration(), V1.callbackTimeout(), true);
@@ -81,7 +81,7 @@ class HistoryReplayTest {
       awaitStep(wf, Steps.HUMAN_TASK);
       wf.review(new ReviewDecision("rec-humanreview-r1", ReviewAction.REJECT, "Sam", "recorded"));
     });
-    record("v1-erp-posting.json", Route.ERP_POSTING, false, (wf, client) -> {
+    record("v1-invoice.json", Route.INVOICE, false, (wf, client) -> {
       awaitStep(wf, Steps.AWAIT_ERP_CONFIRMATION);
       wf.erpPostingConfirmed(new ErpConfirmation("ERP-rec", "now"));
     });
