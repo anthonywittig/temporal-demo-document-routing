@@ -36,8 +36,8 @@ class DocumentActivitiesTest {
   DocumentActivities activities;
   final LinkedBlockingQueue<JsonNode> callbacks = new LinkedBlockingQueue<>();
 
-  static final DocumentRequest BU1_INVOICE = new DocumentRequest("d1", "BU1", "invoice", 3000, "CC-10", "Dana");
-  static final DocumentRequest BAD_CC = new DocumentRequest("d2", "BU2", "purchase-order", 800, "CC-99", "Dana");
+  static final DocumentRequest NUTRITION_INVOICE = new DocumentRequest("d1", "Nutrition", "invoice", 3000, "CC-10", "Dana");
+  static final DocumentRequest BAD_CC = new DocumentRequest("d2", "Devices", "purchase-order", 800, "CC-99", "Dana");
 
   @BeforeEach
   void setUp() throws Exception {
@@ -71,9 +71,9 @@ class DocumentActivitiesTest {
 
   @Test
   void classifyAndRoute() {
-    String type = activities.classify(BU1_INVOICE);
+    String type = activities.classify(NUTRITION_INVOICE);
     assertEquals("invoice", type);
-    var decision = activities.evaluateRules(BU1_INVOICE, type, false);
+    var decision = activities.evaluateRules(NUTRITION_INVOICE, type, false);
     assertEquals(Route.B, decision.path());
     assertEquals(1, decision.rulesVersion());
   }
@@ -88,7 +88,7 @@ class DocumentActivitiesTest {
 
   @Test
   void erpPostingCallsBackToTheWebApp() throws Exception {
-    String postingId = activities.postInvoiceToErp(BU1_INVOICE);
+    String postingId = activities.postInvoiceToErp(NUTRITION_INVOICE);
     assertTrue(postingId.startsWith("ERP-"));
     JsonNode ack = callbacks.poll(5, TimeUnit.SECONDS);
     assertNotNull(ack);
@@ -106,10 +106,10 @@ class DocumentActivitiesTest {
 
   @Test
   void sideEffectsAreSentWithStableIdempotencyKeys() throws Exception {
-    activities.reserveBudget(BU1_INVOICE);
-    activities.reserveBudget(BU1_INVOICE); // same workflow + activity type => same key
-    activities.releaseBudget(BU1_INVOICE);
-    activities.notifyRequester(BU1_INVOICE, "done");
+    activities.reserveBudget(NUTRITION_INVOICE);
+    activities.reserveBudget(NUTRITION_INVOICE); // same workflow + activity type => same key
+    activities.releaseBudget(NUTRITION_INVOICE);
+    activities.notifyRequester(NUTRITION_INVOICE, "done");
     JsonNode effects = effects();
     assertEquals(3, effects.size(), effects.toString());
     assertEquals("Reserve budget", effects.get(0).get("action").asText());
