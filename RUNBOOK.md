@@ -87,13 +87,13 @@ Thirty-second version: "A document comes in, is classified, and business-unit ru
 
 1. Click **Services · invoice · $3,000**. A toast says "Started D…".
 2. Within about 5 seconds, the row in **Recent requests** shows path **Invoice**, step **Completed**, version **v1**.
-3. Click the document ID. In the Temporal UI's Event History, point out (the timeline labels each step with a readable summary; the Activity type is in parentheses):
-   - **Classify**;
-   - **Evaluate Rules** (`EvaluateRules`), whose result shows path `Invoice`, the reason ("cost 3000 is within 5000"), and `rulesVersion: 1`;
-   - **Post Invoice to ERP** (`PostInvoiceToErp`);
-   - the timer **Wait for ERP Confirmation (2m)** starts: the deadline for the ERP to answer;
-   - the **`ErpPostingConfirmed`** Signal, about 4 seconds later, and the timer is canceled;
-   - **Notify Requester** (`NotifyRequester`).
+3. Click the document ID. In the Temporal UI's Event History, point out:
+   - `Classify`;
+   - `EvaluateRules`, whose result shows path `Invoice`, the reason ("cost 3000 is within 5000"), and `rulesVersion: 1`;
+   - `PostInvoiceToErp`;
+   - the timer `WaitForErpConfirmation` (2m) starts: the deadline for the ERP to answer;
+   - the `ErpPostingConfirmed` Signal, about 4 seconds later, and the timer is canceled;
+   - `NotifyRequester`.
 4. Say: "The ERP took the invoice and confirmed the posting later, on its own schedule. That callback came in as a Signal. Temporal recorded it in the history, and the workflow carried on to notify the requester. The synchronous call and the asynchronous confirmation are both just steps in one durable function."
 
 ### 2. The same document, twice
@@ -117,7 +117,7 @@ Thirty-second version: "A document comes in, is classified, and business-unit ru
 2. The request goes back through the rules in force now, **v2**, carrying the approval. Under v2 the cost is within Equipment's new threshold, so the rules don't need a review any more and route it to `Invoice` on their own; it completes. Open it in the Temporal UI: there are two `EvaluateRules` results, v1 → `HumanReview` ("cost 3000 is above the human-review threshold 1000") and then v2 → `Invoice` ("cost 3000 is within 5000"), with the Update `Review` between them carrying the reviewer and the comment. Had v2 still put the cost above the threshold, the approval would have stood in for that review, and the reason would read "cost 3000 is above …, approved by a reviewer".
 3. Say: "Approval is a loop in code, not a special feature. The request re-runs the rules in force now. The approval only matters if those rules still want a person to look; if they don't, the new rules route it. It arrived under v1, and its second decision was made by v2. Whoever opens the history sees both decisions, which rules made each one, and who made the call in between."
 4. Click **Services · invoice · $12,000**. It lands in the inbox (above the Services threshold of 5000). Click **Waiting on a person** under **Temporal UI views** to show the same list in the Temporal UI.
-5. Let the SLA run out while you talk (60 seconds by default). The row turns red with **SLA breached**. In the Temporal UI, **SLA breached** lists it, and the request's timeline shows the fired **Review SLA (1m)** timer.
+5. Let the SLA run out while you talk (60 seconds by default). The row turns red with **SLA breached**. In the Temporal UI, **SLA breached** lists it, and the request's timeline shows the fired `ReviewSla` (1m) timer.
 6. Say: "The SLA is a durable timer. Breaching it flags the request; it doesn't cancel it. A late decision still counts. In production the flag is what you alert on."
 7. **Don't approve or reject this one.** It's the open v1 request for beat 8.
 8. Optional, for a stale click: if anyone asks about double-clicks, act on a task twice. The second click says "Task … is no longer open". The Update's validator rejected it, and nothing was written to history.
@@ -214,10 +214,10 @@ Every side-effecting call also sends `Idempotency-Key: <workflowId>/<activity ty
 
 ### Routing runs in an Activity, and the decision is recorded
 
-[`DocumentRequestWorkflowImpl.java` lines 74–80](src/main/java/io/temporal/demo/docrouting/workflow/DocumentRequestWorkflowImpl.java#L74-L80):
+[`DocumentRequestWorkflowImpl.java` lines 76–82](src/main/java/io/temporal/demo/docrouting/workflow/DocumentRequestWorkflowImpl.java#L76-L82):
 
 ```java
-RoutingDecision route = activity("Evaluate Rules").evaluateRules(doc, docType, costApproved);
+RoutingDecision route = activities.evaluateRules(doc, docType, costApproved);
 Workflow.upsertTypedSearchAttributes(
     PATH.valueSet(route.path().value()), RULES_VERSION.valueSet((long) route.rulesVersion()));
 ```
@@ -226,7 +226,7 @@ The rules file is read on every evaluation and validated, and the last good vers
 
 ### A human task: an Update with a validator
 
-[`DocumentRequestWorkflowImpl.java` lines 135–153](src/main/java/io/temporal/demo/docrouting/workflow/DocumentRequestWorkflowImpl.java#L135-L153):
+[`DocumentRequestWorkflowImpl.java` lines 137–155](src/main/java/io/temporal/demo/docrouting/workflow/DocumentRequestWorkflowImpl.java#L137-L155):
 
 ```java
 public void validateReview(ReviewDecision d) {
@@ -241,11 +241,11 @@ A rejected Update is never written to history. An accepted one carries the revie
 
 ### An SLA that flags without cancelling
 
-[`DocumentRequestWorkflowImpl.java` lines 119–132](src/main/java/io/temporal/demo/docrouting/workflow/DocumentRequestWorkflowImpl.java#L119-L132):
+[`DocumentRequestWorkflowImpl.java` lines 121–134](src/main/java/io/temporal/demo/docrouting/workflow/DocumentRequestWorkflowImpl.java#L121-L134):
 
 ```java
 CancellationScope sla = Workflow.newCancellationScope(() ->
-    Workflow.newTimer(settings.slaDuration(), named("Review SLA")).handle((ignored, canceled) -> {
+    Workflow.newTimer(settings.slaDuration(), named("ReviewSla")).handle((ignored, canceled) -> {
       if (canceled == null) Workflow.upsertTypedSearchAttributes(SLA_BREACHED.valueSet(true));
       return null;
     }));
@@ -256,11 +256,11 @@ sla.cancel();
 
 ### Turn a callback into a Signal
 
-The web app receives the ERP's confirmation callback and signals the workflow ([`WebServer.java` lines 224–240](src/main/java/io/temporal/demo/docrouting/web/WebServer.java#L224-L240)). The workflow waits with a deadline ([`DocumentRequestWorkflowImpl.java` lines 165–176](src/main/java/io/temporal/demo/docrouting/workflow/DocumentRequestWorkflowImpl.java#L165-L176)):
+The web app receives the ERP's confirmation callback and signals the workflow ([`WebServer.java` lines 224–240](src/main/java/io/temporal/demo/docrouting/web/WebServer.java#L224-L240)). The workflow waits with a deadline ([`DocumentRequestWorkflowImpl.java` lines 167–178](src/main/java/io/temporal/demo/docrouting/workflow/DocumentRequestWorkflowImpl.java#L167-L178)):
 
 ```java
-// a named timer, so the Temporal UI shows "Wait for ERP Confirmation (2m)"
-if (!awaitWithTimer(settings.callbackTimeout(), "Wait for ERP Confirmation", () -> erpConfirmation != null)) {
+// a named timer, so the Temporal UI shows "WaitForErpConfirmation (2m)"
+if (!awaitWithTimer(settings.callbackTimeout(), "WaitForErpConfirmation", () -> erpConfirmation != null)) {
   throw ApplicationFailure.newNonRetryableFailure("The ERP did not confirm the posting within ...", "CallbackTimeout");
 }
 ```
@@ -276,19 +276,19 @@ throw ApplicationFailure.newNonRetryableFailure(message, REJECTED);             
 
 ### Undo completed steps
 
-[`DocumentRequestWorkflowImpl.java` lines 192–213](src/main/java/io/temporal/demo/docrouting/workflow/DocumentRequestWorkflowImpl.java#L192-L213):
+[`DocumentRequestWorkflowImpl.java` lines 194–215](src/main/java/io/temporal/demo/docrouting/workflow/DocumentRequestWorkflowImpl.java#L194-L215):
 
 ```java
 Saga saga = new Saga(new Saga.Options.Builder().setParallelCompensation(false).build());
-activity("Reserve Budget").reserveBudget(doc);
-saga.addCompensation(activity("Release Budget")::releaseBudget, doc);   // more steps would register theirs here
-try { activity("Send Purchase Order").sendPurchaseOrder(doc); }
+activities.reserveBudget(doc);
+saga.addCompensation(activities::releaseBudget, doc);   // more steps would register theirs here
+try { activities.sendPurchaseOrder(doc); }
 catch (ActivityFailure e) { saga.compensate(); ... }
 ```
 
 ### Progress you can search, and an inbox that needs no worker
 
-The workflow keeps `Step` current at every step ([`DocumentRequestWorkflowImpl.java` line 257](src/main/java/io/temporal/demo/docrouting/workflow/DocumentRequestWorkflowImpl.java#L257-L259)), and puts the task details in its memo ([line 116](src/main/java/io/temporal/demo/docrouting/workflow/DocumentRequestWorkflowImpl.java#L111-L117)). The inbox is a visibility query, not a Query, so it works with no worker running ([`WebServer.java` lines 254–261](src/main/java/io/temporal/demo/docrouting/web/WebServer.java#L254-L261)):
+The workflow keeps `Step` current at every step ([`DocumentRequestWorkflowImpl.java` line 249](src/main/java/io/temporal/demo/docrouting/workflow/DocumentRequestWorkflowImpl.java#L249-L251)), and puts the task details in its memo ([line 117](src/main/java/io/temporal/demo/docrouting/workflow/DocumentRequestWorkflowImpl.java#L112-L117)). The inbox is a visibility query, not a Query, so it works with no worker running ([`WebServer.java` lines 254–261](src/main/java/io/temporal/demo/docrouting/web/WebServer.java#L254-L261)):
 
 ```java
 client.listExecutions("WorkflowType=\"DocumentRequestWorkflow\" AND ExecutionStatus=\"Running\" AND Step=\"HumanTask\"")

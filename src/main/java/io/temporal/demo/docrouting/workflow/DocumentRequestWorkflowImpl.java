@@ -44,6 +44,8 @@ public class DocumentRequestWorkflowImpl implements DocumentRequestWorkflow {
           .build();
 
   private final WorkflowSettings settings;
+  private final DocumentActivities activities =
+      Workflow.newActivityStub(DocumentActivities.class, ACTIVITY_OPTIONS);
 
   // Human review state
   private String openTaskId;
@@ -62,7 +64,7 @@ public class DocumentRequestWorkflowImpl implements DocumentRequestWorkflow {
     Workflow.upsertTypedSearchAttributes(BUSINESS_UNIT.valueSet(doc.businessUnit()));
 
     step(Steps.CLASSIFY);
-    String docType = activity("Classify").classify(doc);
+    String docType = activities.classify(doc);
     // Set once a reviewer approves the cost. Later evaluations still apply the rules in force
     // then; the approval only counts if those rules would still send the cost to a person.
     boolean costApproved = false;
@@ -74,7 +76,7 @@ public class DocumentRequestWorkflowImpl implements DocumentRequestWorkflow {
       step(Steps.EVALUATE_RULES);
       // Routing runs in an Activity: the rules are read from outside, and the decision (with
       // the rules version that made it) is recorded in history. In-flight requests keep it.
-      RoutingDecision route = activity("Evaluate Rules").evaluateRules(doc, docType, costApproved);
+      RoutingDecision route = activities.evaluateRules(doc, docType, costApproved);
       Workflow.upsertTypedSearchAttributes(
           PATH.valueSet(route.path().value()), RULES_VERSION.valueSet((long) route.rulesVersion()));
       log.info("{} routed to path {} by rules v{}: {}", doc.documentId(), route.path(), route.rulesVersion(), route.reason());
@@ -117,7 +119,7 @@ public class DocumentRequestWorkflowImpl implements DocumentRequestWorkflow {
 
     // The SLA marks the task as breached but doesn't cancel it: a late decision still counts.
     CancellationScope sla = Workflow.newCancellationScope(() ->
-        Workflow.newTimer(settings.slaDuration(), named("Review SLA")).handle((ignored, canceled) -> {
+        Workflow.newTimer(settings.slaDuration(), named("ReviewSla")).handle((ignored, canceled) -> {
           if (canceled == null) {
             log.info("{} task {} breached its SLA", doc.documentId(), openTaskId);
             Workflow.upsertTypedSearchAttributes(SLA_BREACHED.valueSet(true));
@@ -153,7 +155,7 @@ public class DocumentRequestWorkflowImpl implements DocumentRequestWorkflow {
 
   /** The reviewer turned the request down: tell the requester and end, with nothing else to undo. */
   private RequestOutcome rejectedByReviewer(DocumentRequest doc, RoutingDecision route, ReviewDecision review) {
-    activity("Notify Requester").notifyRequester(doc, "rejected by " + review.reviewer());
+    activities.notifyRequester(doc, "rejected by " + review.reviewer());
     step(Steps.REJECTED);
     return new RequestOutcome(RequestOutcome.REJECTED, route.path(), route.rulesVersion(),
         "Rejected by " + review.reviewer());
@@ -163,16 +165,16 @@ public class DocumentRequestWorkflowImpl implements DocumentRequestWorkflow {
 
   private RequestOutcome invoice(DocumentRequest doc, RoutingDecision route) {
     step(Steps.POST_TO_ERP);
-    activity("Post Invoice to ERP").postInvoiceToErp(doc);
+    activities.postInvoiceToErp(doc);
 
     step(Steps.AWAIT_ERP_CONFIRMATION);
-    if (!awaitWithTimer(settings.callbackTimeout(), "Wait for ERP Confirmation", () -> erpConfirmation != null)) {
+    if (!awaitWithTimer(settings.callbackTimeout(), "WaitForErpConfirmation", () -> erpConfirmation != null)) {
       throw ApplicationFailure.newNonRetryableFailure(
           "The ERP did not confirm the posting within " + settings.callbackTimeout(), "CallbackTimeout");
     }
 
     step(Steps.NOTIFY);
-    activity("Notify Requester").notifyRequester(doc, "posted to the ERP, reference " + erpConfirmation.postingId());
+    activities.notifyRequester(doc, "posted to the ERP, reference " + erpConfirmation.postingId());
     return finish(doc, route, "Posted to the ERP, requester notified");
   }
 
@@ -187,18 +189,18 @@ public class DocumentRequestWorkflowImpl implements DocumentRequestWorkflow {
     step(Steps.CHECK_COST_CENTER);
     // A 422 here (unknown cost center) is non-retryable: the Workflow fails at this step and
     // waits for an operator to fix the data and reset it.
-    activity("Check Cost Center").checkCostCenter(doc);
+    activities.checkCostCenter(doc);
 
     // Each side-effecting step registers its undo as soon as it has succeeded. There is one
     // today; more steps would register theirs the same way and be undone in reverse order.
     Saga saga = new Saga(new Saga.Options.Builder().setParallelCompensation(false).build());
     step(Steps.RESERVE_BUDGET);
-    activity("Reserve Budget").reserveBudget(doc);
-    saga.addCompensation(activity("Release Budget")::releaseBudget, doc);
+    activities.reserveBudget(doc);
+    saga.addCompensation(activities::releaseBudget, doc);
 
     step(Steps.SEND_PURCHASE_ORDER);
     try {
-      activity("Send Purchase Order").sendPurchaseOrder(doc);
+      activities.sendPurchaseOrder(doc);
     } catch (ActivityFailure e) {
       step(Steps.COMPENSATING);
       saga.compensate(); // releases the budget reservation
@@ -209,7 +211,7 @@ public class DocumentRequestWorkflowImpl implements DocumentRequestWorkflow {
       }
       throw e;
     }
-    activity("Notify Requester").notifyRequester(doc, "purchase order sent to the supplier portal");
+    activities.notifyRequester(doc, "purchase order sent to the supplier portal");
     return finish(doc, route, "Cost center checked, purchase order sent to the supplier portal");
   }
 
@@ -218,7 +220,7 @@ public class DocumentRequestWorkflowImpl implements DocumentRequestWorkflow {
   private RequestOutcome finish(DocumentRequest doc, RoutingDecision route, String detail) {
     if (settings.archiveDocuments()) {
       step(Steps.ARCHIVE);
-      activity("Archive Document").archiveDocument(doc);
+      activities.archiveDocument(doc);
     }
     step(Steps.COMPLETED);
     return new RequestOutcome(RequestOutcome.COMPLETED, route.path(), route.rulesVersion(), detail);
@@ -226,8 +228,8 @@ public class DocumentRequestWorkflowImpl implements DocumentRequestWorkflow {
 
   /**
    * Like {@code Workflow.await(timeout, condition)}, but the timer carries a summary, so the
-   * Temporal UI timeline shows "Wait for ERP Confirmation" instead of a timer ID. Returns false if
-   * the timer fired first.
+   * Temporal UI timeline shows "WaitForErpConfirmation" (PascalCase, like the Activity types)
+   * instead of a timer ID. Returns false if the timer fired first.
    */
   private static boolean awaitWithTimer(Duration timeout, String summary, Supplier<Boolean> condition) {
     @SuppressWarnings("unchecked")
@@ -238,16 +240,6 @@ public class DocumentRequestWorkflowImpl implements DocumentRequestWorkflow {
     if (!condition.get()) return false;
     scope.cancel(); // the condition won: cancel the timer, as Workflow.await(timeout, ...) does
     return true;
-  }
-
-  /**
-   * An Activity stub whose calls carry a summary, so the Temporal UI timeline labels the bar with
-   * a readable phrase ("Evaluate Rules") instead of the Activity type ("EvaluateRules"). The type
-   * itself stays the same, so in-flight requests and recorded histories still replay.
-   */
-  private static DocumentActivities activity(String summary) {
-    return Workflow.newActivityStub(
-        DocumentActivities.class, ActivityOptions.newBuilder(ACTIVITY_OPTIONS).setSummary(summary).build());
   }
 
   private static TimerOptions named(String summary) {

@@ -121,9 +121,12 @@ class DocumentRequestWorkflowTest {
     assertEquals(Steps.COMPLETED, step(wf));
   }
 
-  /** The Temporal UI timeline labels each bar with its summary, so every step reads as a phrase. */
+  /**
+   * Activities carry no summary, so the Temporal UI timeline labels them with their PascalCase
+   * type; timers have no type, so their summaries use the same PascalCase form.
+   */
   @Test
-  void timelineShowsReadableNames() throws Exception {
+  void timelineUsesPascalCaseNames() throws Exception {
     start(true);
     fake.route(Route.INVOICE, 1);
     var wf = begin(doc("t1", "Services", "invoice", 3000));
@@ -140,16 +143,19 @@ class DocumentRequestWorkflowTest {
           ? converter.fromPayload(e.getUserMetadata().getSummary(), String.class, String.class)
           : null;
       switch (e.getEventType()) {
-        case EVENT_TYPE_ACTIVITY_TASK_SCHEDULED -> activities.add(summary);
+        case EVENT_TYPE_ACTIVITY_TASK_SCHEDULED -> {
+          assertNull(summary, "Activities are labelled by their type, not a summary");
+          activities.add(e.getActivityTaskScheduledEventAttributes().getActivityType().getName());
+        }
         case EVENT_TYPE_TIMER_STARTED -> timers.add(summary);
         case EVENT_TYPE_WORKFLOW_EXECUTION_SIGNALED ->
             signals.add(e.getWorkflowExecutionSignaledEventAttributes().getSignalName());
         default -> {}
       }
     }
-    assertEquals(List.of("Classify", "Evaluate Rules", "Post Invoice to ERP", "Notify Requester",
-        "Archive Document"), activities);
-    assertEquals(List.of("Wait for ERP Confirmation"), timers);
+    assertEquals(List.of("Classify", "EvaluateRules", "PostInvoiceToErp", "NotifyRequester",
+        "ArchiveDocument"), activities);
+    assertEquals(List.of("WaitForErpConfirmation"), timers);
     assertEquals(List.of("ErpPostingConfirmed"), signals);
   }
 
