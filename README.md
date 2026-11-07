@@ -22,22 +22,28 @@ You need no Temporal Cloud account, API key, or Docker.
 
 ## Run it
 
-In four terminals, from this directory:
+In two terminals, from this directory:
 
 ```sh
-make temporal   # Temporal dev server; UI at http://localhost:8233
-make systems    # mock ERP, cost-center check, supplier portal and notifications on :8090
+make up         # Temporal dev server, mock systems and the demo app
 make worker     # the Temporal worker (version v1)
-make web        # the demo app at http://localhost:8080
 ```
 
-The first `make systems`, `make worker`, or `make web` copies the default rules and reference data into `data/`. Those copies are what changes live during the demo. The page's **Routing rules** card edits the per-unit thresholds in `data/rules.json`, and you can edit the file by hand too. **Reset demo data** on the page, or `make reset-data`, restores the defaults; the page button also clears the system fault toggles. The rules hold only those thresholds. Below its unit's threshold, a document's path follows from its type: invoices go to `Invoice` and purchase orders to `PurchaseOrder`. Any other type fails at `EvaluateRules` without retrying, before it reaches a reviewer.
+`make up` runs three processes in one terminal, and `Ctrl-C` stops all three:
 
-The dev server keeps everything in memory. Stopping `make temporal` clears every request.
+- the Temporal dev server, with its UI at http://localhost:8233;
+- the mock ERP, cost-center check, supplier portal and notifications on :8090;
+- the demo app at http://localhost:8080.
+
+The worker runs on its own because the demo stops and restarts it. To run the other three in separate terminals instead, use `make temporal`, `make systems` and `make web`.
+
+The first `make up` or `make worker` copies the default rules and reference data into `data/`. Those copies are what changes live during the demo. The page's **Routing rules** card edits the per-unit thresholds in `data/rules.json`, and you can edit the file by hand too. **Reset demo data** on the page, or `make reset-data`, restores the defaults; the page button also clears the system fault toggles. The rules hold only those thresholds. Below its unit's threshold, a document's path follows from its type: invoices go to `Invoice` and purchase orders to `PurchaseOrder`. Any other type fails at `EvaluateRules` without retrying, before it reaches a reviewer.
+
+The dev server keeps everything in memory. Stopping it clears every request.
 
 ## The mock systems
 
-`make systems` runs every external system in one process on :8090. Stopping it is a real outage of all of them.
+Every external system runs in one process on :8090. `make stop-systems` stops it, a real outage of all of them, and `make systems` starts it again.
 
 | Endpoint | Behaves like |
 |---|---|

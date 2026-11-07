@@ -35,7 +35,7 @@ You need JDK 21 or later on your `PATH`, Maven 3.9 or later, and Temporal CLI 1.
 
 Run `make test` once on the machine you'll present from. The first run downloads dependencies.
 
-Have five terminals open in `temporal-demo-document-routing/`, plus a browser with two tabs, and an editor with `data/reference-data.json` open for beat 7. (`make systems` creates the `data/` files on its first run.) Open `data/rules.json` as well if you'd rather show beat 3 as a file edit.
+Have three terminals open in `temporal-demo-document-routing/`, plus a browser with two tabs, and an editor with `data/reference-data.json` open for beat 7. (`make up` creates the `data/` files on its first run.) Open `data/rules.json` as well if you'd rather show beat 3 as a file edit.
 
 If the page doesn't show **rules v1** when you start, an earlier rehearsal left its edits behind: click **Reset demo data** in the **Routing rules** card.
 
@@ -45,14 +45,15 @@ For a rehearsal, start the worker with `SLA_DURATION=20s make worker` so SLA bre
 
 ### Locally
 
-In four terminals:
+In two terminals:
 
-1. `make temporal`: the Temporal dev server, with UI at http://localhost:8233. It registers the `Step`, `Path`, `BusinessUnit`, `SlaBreached` and `RulesVersion` search attributes.
-2. `make systems`: the mock external systems on :8090. Beat 5's optional harder outage stops and starts this one.
-3. `make worker`: worker version `v1`. You stop and start this one in beat 5. On a fresh dev server it logs `had no current version; made v1 current`.
-4. `make web`: the demo app at http://localhost:8080.
+1. `make up`: starts three processes in this terminal, and `Ctrl-C` stops all three:
+   - the Temporal dev server, with UI at http://localhost:8233. It registers the `Step`, `Path`, `BusinessUnit`, `SlaBreached` and `RulesVersion` search attributes;
+   - the mock external systems on :8090. Beat 5's optional harder outage stops and starts these;
+   - the demo app at http://localhost:8080.
+2. `make worker`: worker version `v1`. You stop and start this one in beat 5. On a fresh dev server it logs `had no current version; made v1 current`. Start it once the dev server is up.
 
-Keep the fifth terminal free for beat 7's reset command and beat 8's second worker.
+Keep a third terminal free for beat 7's reset command and beat 8's second worker. If you'll show beat 5's optional harder outage, keep a fourth for it.
 
 A healthy start shows the following on http://localhost:8080:
 - the top bar shows **rules v1** and `task queue · document-routing`;
@@ -132,7 +133,7 @@ Thirty-second version: "A document comes in, is classified, and business-unit ru
 6. Untick the toggle. It reads **ERP is up** again. The request is still waiting, because there's no worker.
 7. Start `make worker` again. Within about 15 seconds, the next retry succeeds, the ERP's confirmation arrives, and the request completes.
 8. Say: "Both the ERP and the worker went away mid-request. When they came back, the request picked up at the step it was on. It posted to the ERP once and notified once. The retry state, the timer and the progress all lived in Temporal, not in the process we killed."
-9. Optional, for a harder outage: instead of the toggle in step 1, press `Ctrl-C` in the `make systems` terminal. Every mock system goes away, the **External systems** card turns red ("Systems process unreachable"), and the last failure reads "Connection refused". In step 6, start `make systems` again instead of unticking. The retry behavior is the same.
+9. Optional, for a harder outage: instead of the toggle in step 1, run `make stop-systems` in the fourth terminal. Every mock system goes away, the **External systems** card turns red ("Systems process unreachable"), and the last failure reads "Connection refused". In step 6, run `make systems` in that terminal instead of unticking. It keeps running there for the rest of the demo. The retry behavior is the same.
 
 ### 6. The supplier says no; the budget is released
 
@@ -153,7 +154,7 @@ Thirty-second version: "A document comes in, is classified, and business-unit ru
 3. Open one. The failure says `POST /cost-centers/check returned HTTP 422: Cost-center check: unknown cost center CC-99`. Point out that `CheckCostCenter` ran once: a 422 is never retried.
 4. Say: "This is where a dead-letter queue would come in. Here, the failed request is the record: input, error, and where it stopped, searchable alongside everything else. And nothing else was blocked behind it."
 5. Fix the data. In `data/reference-data.json`, add `"CC-99"` to `costCenters` and save. Nothing needs restarting.
-6. In the fifth terminal, replay every request that failed this way:
+6. In the third terminal, replay every request that failed this way:
 
    ```sh
    temporal workflow reset --disable-config-file \
@@ -170,7 +171,7 @@ Thirty-second version: "A document comes in, is classified, and business-unit ru
 
 The Services $12,000 request from beat 4 should still be open in the inbox, on v1.
 
-1. In the fifth terminal: `make worker BUILD_ID=v2`. It starts polling. v1 is still current, so new requests still go to v1.
+1. In the third terminal: `make worker BUILD_ID=v2`. It starts polling. v1 is still current, so new requests still go to v1.
 2. `make promote BUILD_ID=v2`. It prints "Successfully set the current worker deployment version".
 3. Click **Services · invoice · $3,000**. Its row shows version **v2**. In the Temporal UI, its history ends with an `ArchiveDocument` step that v1 doesn't have.
 4. In the inbox, **Approve** the open $12,000 request. It goes on down `Invoice` on v1 code and completes. Its row shows **v1**, and its history has no `ArchiveDocument` step.
@@ -328,20 +329,20 @@ WorkerDeploymentOptions.newBuilder()
 
 ## Reset and tear down
 
-- **Between rehearsals:** click **Reset demo data** (or run `make reset-data`), `Ctrl-C` every terminal, then start again from [Start it](#start-it). The dev server keeps everything in memory, so stopping `make temporal` clears every request and both worker versions, and the first `make worker` makes v1 current again.
+- **Between rehearsals:** click **Reset demo data** (or run `make reset-data`), `Ctrl-C` every terminal, then start again from [Start it](#start-it). The dev server keeps everything in memory, so stopping `make up` clears every request and both worker versions, and the first `make worker` makes v1 current again.
 - **Without restarting Temporal:** **Reset demo data** in the **Routing rules** card restores rules v1, removes CC-99 from the reference data, and clears both system toggles, after a confirmation. `make reset-data` restores the two files from a terminal. Old requests stay listed; that's harmless.
-- **Before beat 8 in a rehearsal where v2 is already current:** restart `make temporal`. Otherwise new requests go straight to v2.
+- **Before beat 8 in a rehearsal where v2 is already current:** restart `make up`. Otherwise new requests go straight to v2.
 
 ## When something goes wrong
 
 | What you see | Likely cause | Fix |
 |---|---|---|
-| Banner "Reconnecting to Temporal…" | The web app can't reach the dev server | Start `make temporal`, then refresh |
-| **External systems** card is red, "unreachable" | The systems process isn't running | `make systems` |
+| Banner "Reconnecting to Temporal…" | The web app can't reach the dev server | Start `make up`, then refresh |
+| **External systems** card is red, "unreachable" | The systems process isn't running | `make systems` (or `make up` if nothing is running) |
 | An `Invoice` request sits at **PostToErp** with attempts climbing | The **ERP is DOWN (503)** toggle is still on, perhaps from beat 5 | Untick it; the next retry succeeds |
 | A new request stays at step **Received** | No worker is running, or the deployment has no current version | `make worker`. If it's running, check `temporal worker deployment describe --name document-routing --disable-config-file` and `make promote BUILD_ID=v1` |
 | Toast "No worker has accepted the decision yet…" | The worker is stopped | Start `make worker`. The decision is applied when it starts; clicking again is safe |
-| An `Invoice` request sits at **AwaitErpConfirmation** | The ERP's callback can't reach the web app | Keep `make web` running; the ERP retries the callback. After `CALLBACK_TIMEOUT` (2 minutes) the request fails with "The ERP did not confirm the posting" |
+| An `Invoice` request sits at **AwaitErpConfirmation** | The ERP's callback can't reach the web app | Keep `make up` running; the ERP retries the callback. After `CALLBACK_TIMEOUT` (2 minutes) the request fails with "The ERP did not confirm the posting" |
 | A request shows **Failed** at step **PostToErp** (or another external step) | The systems process was down longer than the retry bound, about 3 minutes (20 attempts) | Start `make systems`, then replay as in beat 7: `temporal workflow reset --disable-config-file --query 'ExecutionStatus="Failed" AND Step="PostToErp"' --type FirstWorkflowTask --reason "ERP back" --yes` |
 | The page shows **rules v2** (or later) right after starting | An earlier rehearsal's edits are still in `data/` | Click **Reset demo data** |
 | Rules badge is amber and a banner says the edit was rejected | `data/rules.json` doesn't parse or validate | Fix the file, or save from the **Routing rules** card, which writes a valid file; the banner names the problem. The last good version stays in force meanwhile |
