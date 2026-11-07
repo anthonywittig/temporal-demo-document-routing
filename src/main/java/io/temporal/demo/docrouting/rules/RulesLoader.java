@@ -137,6 +137,9 @@ public final class RulesLoader {
       if (unit.humanReviewAbove() < 0) problems.add(name + ".humanReviewAbove must not be negative");
       if (unit.externalChecksFor() == null) problems.add(name + ".externalChecksFor is required");
       if (unit.defaultPath() == null) problems.add(name + ".default must be one of " + Route.allValues());
+      // HumanReview is reached by the cost threshold. As a default it would send an approved
+      // request straight back to a reviewer, round after round.
+      if (unit.defaultPath() == Route.HUMAN_REVIEW) problems.add(name + ".default must not be HumanReview");
     });
     return problems;
   }

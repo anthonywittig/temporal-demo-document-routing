@@ -103,6 +103,16 @@ class RulesLoaderTest {
   }
 
   @Test
+  void humanReviewDefaultIsRejected() throws IOException {
+    loader.current();
+    Files.writeString(file, V1.replace("\"version\": 1", "\"version\": 2")
+        .replace("\"default\": \"ErpPosting\" },", "\"default\": \"HumanReview\" },"));
+    assertEquals(1, loader.current().version());
+    assertTrue(loader.status().lastRejection().contains("Services.default must not be HumanReview"),
+        loader.status().lastRejection());
+  }
+
+  @Test
   void olderRulesFilesWithPathLettersStillLoad() throws IOException {
     Files.writeString(file, V1.replace("\"ErpPosting\"", "\"B\""));
     assertEquals(Route.ERP_POSTING, loader.current().businessUnits().get("Services").defaultPath());

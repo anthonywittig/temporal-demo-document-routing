@@ -27,12 +27,6 @@ public class DocumentRequestWorkflowImpl implements DocumentRequestWorkflow {
   private static final Logger log = Workflow.getLogger(DocumentRequestWorkflowImpl.class);
 
   /**
-   * A request that keeps coming back to a person (only possible if a unit's default path is HumanReview)
-   * stops after this many rounds instead of looping forever.
-   */
-  static final int MAX_ROUNDS = 5;
-
-  /**
    * Every external call: give up on one attempt after 5s, retry transient failures with
    * exponential backoff (1s, 2s, 4s ... capped at 10s) for about three minutes, and never retry a
    * failure the activity marked non-retryable (a 4xx such as 422).
@@ -74,7 +68,10 @@ public class DocumentRequestWorkflowImpl implements DocumentRequestWorkflow {
     // Set once a reviewer approves the cost; later evaluations skip the cost threshold.
     boolean costApproved = false;
 
-    for (int round = 1; round <= MAX_ROUNDS; round++) {
+    // At most two rounds: once the cost is approved the rules can't route back to HumanReview,
+    // because a unit's default path may not be HumanReview (RulesLoader.validate). The round
+    // number keeps each review task's ID unique, so a stale decision can't approve a later task.
+    for (int round = 1; ; round++) {
       step(Steps.EVALUATE_RULES);
       // Routing runs in an Activity: the rules are read from outside, and the decision (with
       // the rules version that made it) is recorded in history. In-flight requests keep it.
@@ -102,8 +99,6 @@ public class DocumentRequestWorkflowImpl implements DocumentRequestWorkflow {
         }
       }
     }
-    throw ApplicationFailure.newNonRetryableFailure(
-        "Routed to a reviewer " + MAX_ROUNDS + " times; stopping for an operator to review", "TooManyRounds");
   }
 
   // ---- HumanReview: a person approves or rejects the cost -----------------------------------
