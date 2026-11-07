@@ -92,7 +92,7 @@ Thirty-second version: "A document comes in, is classified, and business-unit ru
    - **Evaluate Rules** (`EvaluateRules`), whose result shows path `Invoice`, the reason ("cost 3000 is within 5000"), and `rulesVersion: 1`;
    - **Post Invoice to ERP** (`PostInvoiceToErp`);
    - the timer **Wait for ERP Confirmation (2m)** starts: the deadline for the ERP to answer;
-   - the **ERP Posting Confirmed** Signal, about 4 seconds later, and the timer is canceled;
+   - the **`ErpPostingConfirmed`** Signal, about 4 seconds later, and the timer is canceled;
    - **Notify Requester** (`NotifyRequester`).
 4. Say: "The ERP took the invoice and confirmed the posting later, on its own schedule. That callback came in as a Signal. Temporal recorded it in the history, and the workflow carried on to notify the requester. The synchronous call and the asynchronous confirmation are both just steps in one durable function."
 

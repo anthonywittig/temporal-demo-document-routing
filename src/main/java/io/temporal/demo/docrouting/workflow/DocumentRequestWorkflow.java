@@ -28,15 +28,6 @@ public interface DocumentRequestWorkflow {
   void validateReview(ReviewDecision decision);
 
   /** Invoice: the ERP's confirmation of the posting, delivered by callback. */
-  @SignalMethod(name = "ERP Posting Confirmed")
-  void erpPostingConfirmed(ErpConfirmation ack);
-
-  /**
-   * The same Signal under its earlier name, so requests started before the rename (and the
-   * recorded v1 histories) still receive it. Nothing sends this name any more.
-   */
   @SignalMethod(name = "ErpPostingConfirmed")
-  default void erpPostingConfirmedLegacy(ErpConfirmation ack) {
-    erpPostingConfirmed(ack);
-  }
+  void erpPostingConfirmed(ErpConfirmation ack);
 }

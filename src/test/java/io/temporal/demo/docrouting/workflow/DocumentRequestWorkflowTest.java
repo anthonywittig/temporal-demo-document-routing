@@ -150,7 +150,7 @@ class DocumentRequestWorkflowTest {
     assertEquals(List.of("Classify", "Evaluate Rules", "Post Invoice to ERP", "Notify Requester",
         "Archive Document"), activities);
     assertEquals(List.of("Wait for ERP Confirmation"), timers);
-    assertEquals(List.of("ERP Posting Confirmed"), signals);
+    assertEquals(List.of("ErpPostingConfirmed"), signals);
   }
 
   @Test
