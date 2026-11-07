@@ -4,6 +4,8 @@ import io.temporal.activity.Activity;
 import io.temporal.activity.ActivityInfo;
 import io.temporal.demo.docrouting.rules.RulesLoader;
 import io.temporal.demo.docrouting.workflow.DocumentRequest;
+import io.temporal.demo.docrouting.workflow.EvaluateRulesInput;
+import io.temporal.demo.docrouting.workflow.NotifyRequesterInput;
 import io.temporal.demo.docrouting.workflow.RoutingDecision;
 import io.temporal.failure.ApplicationFailure;
 import java.time.Duration;
@@ -39,10 +41,11 @@ public class DocumentActivitiesImpl implements DocumentActivities {
   }
 
   @Override
-  public RoutingDecision evaluateRules(DocumentRequest doc, String docType, boolean costApproved) {
+  public RoutingDecision evaluateRules(EvaluateRulesInput input) {
     pause();
+    DocumentRequest doc = input.doc();
     try {
-      return rules.evaluate(doc.businessUnit(), docType, doc.cost(), costApproved);
+      return rules.evaluate(doc.businessUnit(), input.docType(), doc.cost(), input.costApproved());
     } catch (RulesLoader.UnknownBusinessUnitException | RulesLoader.UnknownDocumentTypeException e) {
       throw ApplicationFailure.newNonRetryableFailure(e.getMessage(), HttpCalls.REJECTED);
     }
@@ -56,8 +59,8 @@ public class DocumentActivitiesImpl implements DocumentActivities {
   }
 
   @Override
-  public void notifyRequester(DocumentRequest doc, String message) {
-    post("/notify", doc, Map.of("detail", doc.requester() + ": " + message));
+  public void notifyRequester(NotifyRequesterInput input) {
+    post("/notify", input.doc(), Map.of("detail", input.doc().requester() + ": " + input.message()));
   }
 
   @Override
