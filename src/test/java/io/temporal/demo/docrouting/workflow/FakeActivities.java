@@ -14,6 +14,8 @@ import java.util.concurrent.CopyOnWriteArrayList;
 public class FakeActivities implements DocumentActivities {
   public final List<String> calls = new CopyOnWriteArrayList<>();
   final Deque<RoutingDecision> decisions = new ArrayDeque<>();
+  /** The costApproved flag passed to each evaluateRules call, in order. */
+  public final List<Boolean> costApprovedFlags = new CopyOnWriteArrayList<>();
   volatile boolean costCenterUnknown;
   volatile boolean supplierRejects;
 
@@ -37,8 +39,9 @@ public class FakeActivities implements DocumentActivities {
   }
 
   @Override
-  public synchronized RoutingDecision evaluateRules(DocumentRequest doc, String docType) {
+  public synchronized RoutingDecision evaluateRules(DocumentRequest doc, String docType, boolean costApproved) {
     record();
+    costApprovedFlags.add(costApproved);
     // The last scripted decision repeats once the script runs out.
     return decisions.size() > 1 ? decisions.poll() : decisions.peek();
   }

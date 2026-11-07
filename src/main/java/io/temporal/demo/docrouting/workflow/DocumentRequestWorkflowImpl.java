@@ -26,7 +26,10 @@ import org.slf4j.Logger;
 public class DocumentRequestWorkflowImpl implements DocumentRequestWorkflow {
   private static final Logger log = Workflow.getLogger(DocumentRequestWorkflowImpl.class);
 
-  /** A request sent back more often than this stops instead of looping forever. */
+  /**
+   * A request that keeps coming back to a person (only possible if a unit's default path is A)
+   * stops after this many rounds instead of looping forever.
+   */
   static final int MAX_ROUNDS = 5;
 
   /**
@@ -68,12 +71,14 @@ public class DocumentRequestWorkflowImpl implements DocumentRequestWorkflow {
 
     step(Steps.CLASSIFY);
     String docType = activities.classify(doc);
+    // Set once a reviewer approves the cost; later evaluations skip the cost threshold.
+    boolean costApproved = false;
 
     for (int round = 1; round <= MAX_ROUNDS; round++) {
       step(Steps.EVALUATE_RULES);
       // Routing runs in an Activity: the rules are read from outside, and the decision (with
       // the rules version that made it) is recorded in history. In-flight requests keep it.
-      RoutingDecision route = activities.evaluateRules(doc, docType);
+      RoutingDecision route = activities.evaluateRules(doc, docType, costApproved);
       Workflow.upsertTypedSearchAttributes(
           PATH.valueSet(route.path().name()), RULES_VERSION.valueSet((long) route.rulesVersion()));
       log.info("{} routed to path {} by rules v{}: {}", doc.documentId(), route.path(), route.rulesVersion(), route.reason());
@@ -81,9 +86,12 @@ public class DocumentRequestWorkflowImpl implements DocumentRequestWorkflow {
       switch (route.path()) {
         case A -> {
           ReviewDecision review = humanTask(doc, route, round);
-          if (review.action() == ReviewAction.SEND_BACK) continue;
-          activities.notifyRequester(doc, "approved by " + review.reviewer());
-          return finish(doc, route, "Completed by " + review.reviewer());
+          if (review.action() == ReviewAction.APPROVE) {
+            // Back through the rules in force now, without the cost check that sent it here.
+            costApproved = true;
+            continue;
+          }
+          return rejectedByReviewer(doc, route, review);
         }
         case B -> {
           pathB(doc);
@@ -95,7 +103,7 @@ public class DocumentRequestWorkflowImpl implements DocumentRequestWorkflow {
       }
     }
     throw ApplicationFailure.newNonRetryableFailure(
-        "Sent back " + MAX_ROUNDS + " times; stopping for an operator to review", "TooManyRounds");
+        "Routed to a reviewer " + MAX_ROUNDS + " times; stopping for an operator to review", "TooManyRounds");
   }
 
   // ---- Path A: human task -------------------------------------------------------------------
@@ -136,7 +144,7 @@ public class DocumentRequestWorkflowImpl implements DocumentRequestWorkflow {
           "Task " + (d == null ? "?" : d.taskId()) + " is no longer open"
               + (openTaskId == null ? "" : "; the open task is " + openTaskId));
     }
-    if (d.action() == null) throw new IllegalArgumentException("Choose COMPLETE or SEND_BACK");
+    if (d.action() == null) throw new IllegalArgumentException("Choose APPROVE or REJECT");
     if (d.reviewer() == null || d.reviewer().isBlank()) throw new IllegalArgumentException("Reviewer is required");
   }
 
@@ -146,7 +154,15 @@ public class DocumentRequestWorkflowImpl implements DocumentRequestWorkflow {
     decision = d;
     openTaskId = null;
     return new ReviewResult(taskId, d.action(),
-        d.action() == ReviewAction.COMPLETE ? "Completed by " + d.reviewer() : "Sent back by " + d.reviewer());
+        d.action() == ReviewAction.APPROVE ? "Approved by " + d.reviewer() : "Rejected by " + d.reviewer());
+  }
+
+  /** The reviewer turned the request down: tell the requester and end, with nothing else to undo. */
+  private RequestOutcome rejectedByReviewer(DocumentRequest doc, RoutingDecision route, ReviewDecision review) {
+    activities.notifyRequester(doc, "rejected by " + review.reviewer());
+    step(Steps.REJECTED);
+    return new RequestOutcome(RequestOutcome.REJECTED, route.path(), route.rulesVersion(),
+        "Rejected by " + review.reviewer());
   }
 
   // ---- Path B: ERP posting, asynchronous confirmation, notification ------------------------

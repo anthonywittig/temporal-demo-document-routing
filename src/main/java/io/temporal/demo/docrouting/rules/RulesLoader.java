@@ -88,25 +88,37 @@ public final class RulesLoader {
    * listed for external checks go to C; everything else takes the unit's default path.
    */
   public RoutingDecision evaluate(String businessUnit, String docType, long cost) {
+    return evaluate(businessUnit, docType, cost, false);
+  }
+
+  /**
+   * As {@link #evaluate(String, String, long)}, but when {@code costApproved} is true a reviewer
+   * has already accepted the cost, so the human-review threshold is skipped and only the remaining
+   * rules decide the path.
+   */
+  public RoutingDecision evaluate(String businessUnit, String docType, long cost, boolean costApproved) {
     Rules rules = current();
     UnitRules unit = rules.businessUnits().get(businessUnit);
     if (unit == null) throw new UnknownBusinessUnitException(businessUnit);
 
-    if (cost > unit.humanReviewAbove()) {
+    if (!costApproved && cost > unit.humanReviewAbove()) {
       return new RoutingDecision(
           Route.A,
           "%s: cost %d is above the human-review threshold %d".formatted(businessUnit, cost, unit.humanReviewAbove()),
           rules.version());
     }
+    String costNote = costApproved
+        ? "cost %d approved by a reviewer".formatted(cost)
+        : "cost %d is within %d".formatted(cost, unit.humanReviewAbove());
     if (unit.externalChecksFor().contains(docType)) {
       return new RoutingDecision(
           Route.C,
-          "%s: %s documents need external checks (cost %d is within %d)".formatted(businessUnit, docType, cost, unit.humanReviewAbove()),
+          "%s: %s documents need external checks (%s)".formatted(businessUnit, docType, costNote),
           rules.version());
     }
     return new RoutingDecision(
         unit.defaultPath(),
-        "%s: default path for %s (cost %d is within %d)".formatted(businessUnit, docType, cost, unit.humanReviewAbove()),
+        "%s: default path for %s (%s)".formatted(businessUnit, docType, costNote),
         rules.version());
   }
 

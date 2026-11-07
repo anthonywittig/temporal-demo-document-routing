@@ -73,7 +73,7 @@ class DocumentActivitiesTest {
   void classifyAndRoute() {
     String type = activities.classify(NUTRITION_INVOICE);
     assertEquals("invoice", type);
-    var decision = activities.evaluateRules(NUTRITION_INVOICE, type);
+    var decision = activities.evaluateRules(NUTRITION_INVOICE, type, false);
     assertEquals(Route.B, decision.path());
     assertEquals(1, decision.rulesVersion());
   }
@@ -81,7 +81,7 @@ class DocumentActivitiesTest {
   @Test
   void unknownBusinessUnitIsNonRetryable() {
     var doc = new DocumentRequest("d3", "BU9", "invoice", 1, "CC-10", "Dana");
-    var e = assertThrows(ActivityFailure.class, () -> activities.evaluateRules(doc, "invoice"));
+    var e = assertThrows(ActivityFailure.class, () -> activities.evaluateRules(doc, "invoice", false));
     var cause = (ApplicationFailure) e.getCause();
     assertTrue(cause.isNonRetryable());
   }

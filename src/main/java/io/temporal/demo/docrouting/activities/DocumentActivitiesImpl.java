@@ -39,10 +39,10 @@ public class DocumentActivitiesImpl implements DocumentActivities {
   }
 
   @Override
-  public RoutingDecision evaluateRules(DocumentRequest doc, String docType) {
+  public RoutingDecision evaluateRules(DocumentRequest doc, String docType, boolean costApproved) {
     pause();
     try {
-      return rules.evaluate(doc.businessUnit(), docType, doc.cost());
+      return rules.evaluate(doc.businessUnit(), docType, doc.cost(), costApproved);
     } catch (RulesLoader.UnknownBusinessUnitException e) {
       throw ApplicationFailure.newNonRetryableFailure(e.getMessage(), HttpCalls.REJECTED);
     }

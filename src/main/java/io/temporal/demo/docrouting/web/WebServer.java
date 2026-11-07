@@ -183,9 +183,16 @@ public final class WebServer {
   private void review(Context ctx) throws Exception {
     JsonNode body = JSON.readTree(ctx.body());
     String workflowId = body.path("workflowId").asText();
+    ReviewAction action;
+    try {
+      action = ReviewAction.valueOf(body.path("action").asText(""));
+    } catch (IllegalArgumentException e) {
+      ctx.status(400).json(Map.of("error", "Choose APPROVE or REJECT"));
+      return;
+    }
     ReviewDecision decision = new ReviewDecision(
         body.path("taskId").asText(),
-        ReviewAction.valueOf(body.path("action").asText("COMPLETE")),
+        action,
         body.path("reviewer").asText("Sam Chen"),
         body.path("comment").asText(""));
 

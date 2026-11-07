@@ -15,8 +15,12 @@ public interface DocumentActivities {
   /** Returns the document type. */
   String classify(DocumentRequest doc);
 
-  /** Reads the current routing rules; the decision, with its rules version, lands in history. */
-  RoutingDecision evaluateRules(DocumentRequest doc, String docType);
+  /**
+   * Reads the current routing rules; the decision, with its rules version, lands in history.
+   *
+   * @param costApproved a reviewer has approved the cost, so the human-review threshold is skipped
+   */
+  RoutingDecision evaluateRules(DocumentRequest doc, String docType, boolean costApproved);
 
   /** Path B. Returns the ERP's posting ID; the confirmation arrives later as a Signal. */
   String postInvoiceToErp(DocumentRequest doc);

@@ -20,7 +20,7 @@ public interface DocumentRequestWorkflow {
   @WorkflowMethod
   RequestOutcome process(DocumentRequest doc);
 
-  /** Path A: a reviewer completes the open task or sends it back. Rejected if the task isn't open. */
+  /** Path A: a reviewer approves or rejects the open task. Refused if the task isn't open. */
   @UpdateMethod(name = "Review")
   ReviewResult review(ReviewDecision decision);
 

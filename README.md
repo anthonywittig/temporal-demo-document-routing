@@ -2,7 +2,7 @@
 
 A document arrives, is classified, and business-unit rules route it down one of three paths:
 
-- **A – Human task.** A reviewer completes the request or sends it back for re-evaluation.
+- **A – Human task.** A reviewer rejects the request, which ends it, or approves its cost, which sends it back through the rules with the cost threshold waived, so it continues down path B or C.
 - **B – ERP posting + notification.** The invoice is posted to the ERP, which confirms the posting asynchronously, and the requester is notified.
 - **C – External checks.** The purchase order's cost center is checked synchronously, budget is reserved, and the PO is sent to the supplier portal. If the supplier rejects it, the budget reservation is released.
 
