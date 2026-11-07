@@ -128,7 +128,7 @@ Thirty-second version: "A document comes in, is classified, and business-unit ru
 1. Tick **ERP is up**. It now reads **ERP is DOWN (503)**.
 2. Click **Services · invoice · $3,000**. The row stays at step **PostToErp**, status **Running**.
 3. Open it in the Temporal UI. Under **Pending Activities**, `PostInvoiceToErp` shows attempt 3, 4, 5… with `POST /erp/invoices returned HTTP 503: The ERP is unavailable` as the last failure.
-4. Say: "The ERP is down. The workflow isn't failing; it's retrying with exponential backoff, 1, 2, 4, up to 10 seconds, for about three minutes. Other requests aren't blocked behind this one. There's no queue head to get stuck."
+4. Say: "The ERP is down. The workflow isn't failing; it's retrying with exponential backoff, 1, 2, 4, up to 10 seconds, for as long as the outage lasts. Other requests aren't blocked behind this one. There's no queue head to get stuck."
 5. Press `Ctrl-C` in the `make worker` terminal. Now nothing is running the workflow either.
 6. Untick the toggle. It reads **ERP is up** again. The request is still waiting, because there's no worker.
 7. Start `make worker` again. Within about 15 seconds, the next retry succeeds, the ERP's confirmation arrives, and the request completes.
@@ -343,7 +343,6 @@ WorkerDeploymentOptions.newBuilder()
 | A new request stays at step **Received** | No worker is running, or the deployment has no current version | `make worker`. If it's running, check `temporal worker deployment describe --name document-routing --disable-config-file` and `make promote BUILD_ID=v1` |
 | Toast "No worker has accepted the decision yet…" | The worker is stopped | Start `make worker`. The decision is applied when it starts; clicking again is safe |
 | An `Invoice` request sits at **AwaitErpConfirmation** | The ERP's callback can't reach the web app | Keep `make up` running; the ERP retries the callback. After `CALLBACK_TIMEOUT` (2 minutes) the request fails with "The ERP did not confirm the posting" |
-| A request shows **Failed** at step **PostToErp** (or another external step) | The systems process was down longer than the retry bound, about 3 minutes (20 attempts) | Start `make systems`, then replay as in beat 7: `temporal workflow reset --disable-config-file --query 'ExecutionStatus="Failed" AND Step="PostToErp"' --type FirstWorkflowTask --reason "ERP back" --yes` |
 | The page shows **rules v2** (or later) right after starting | An earlier rehearsal's edits are still in `data/` | Click **Reset demo data** |
 | Rules badge is amber and a banner says the edit was rejected | `data/rules.json` doesn't parse or validate | Fix the file, or save from the **Routing rules** card, which writes a valid file; the banner names the problem. The last good version stays in force meanwhile |
 | After `make worker BUILD_ID=v2`, new requests still show **v1** | v2 isn't current yet | `make promote BUILD_ID=v2` |
