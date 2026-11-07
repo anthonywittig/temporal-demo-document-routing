@@ -26,21 +26,10 @@ import org.slf4j.Logger;
 public class DocumentRequestWorkflowImpl implements DocumentRequestWorkflow {
   private static final Logger log = Workflow.getLogger(DocumentRequestWorkflowImpl.class);
 
-  /**
-   * Every external call: give up on one attempt after 5s, retry transient failures with
-   * exponential backoff (1s, 2s, 4s ... capped at 10s) for about three minutes, and never retry a
-   * failure the activity marked non-retryable (a 4xx such as 422).
-   */
   static final ActivityOptions ACTIVITY_OPTIONS =
       ActivityOptions.newBuilder()
-          .setStartToCloseTimeout(Duration.ofSeconds(5))
-          .setRetryOptions(
-              RetryOptions.newBuilder()
-                  .setInitialInterval(Duration.ofSeconds(1))
-                  .setBackoffCoefficient(2)
-                  .setMaximumInterval(Duration.ofSeconds(10))
-                  .setMaximumAttempts(20)
-                  .build())
+          .setStartToCloseTimeout(Duration.ofSeconds(10))
+          .setRetryOptions(RetryOptions.newBuilder().setMaximumInterval(Duration.ofSeconds(10)).build())
           .build();
 
   private final WorkflowSettings settings;
