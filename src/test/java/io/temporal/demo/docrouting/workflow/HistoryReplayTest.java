@@ -115,7 +115,7 @@ class HistoryReplayTest {
       WorkflowClient client = env.getWorkflowClient();
       DocumentRequestWorkflow wf = client.newWorkflowStub(DocumentRequestWorkflow.class,
           WorkflowOptions.newBuilder().setTaskQueue(QUEUE).setWorkflowId(DocumentRequestWorkflow.workflowId(id)).build());
-      WorkflowClient.start(wf::process, new DocumentRequest(id, "BU2", "purchase-order", 800, "CC-10", "Dana"));
+      WorkflowClient.start(wf::process, new DocumentRequest(id, "Devices", "purchase-order", 800, "CC-10", "Dana"));
       drive.run(wf, client);
       WorkflowStub.fromTyped(wf).getResult(RequestOutcome.class);
 

@@ -279,8 +279,8 @@ function renderViews() {
     ["Failed at the cost-center check", 'ExecutionStatus="Failed" AND Step="CheckCostCenter"'],
     ["Waiting for the ERP to confirm", 'Step="AwaitErpConfirmation" AND ExecutionStatus="Running"'],
     ["Rejected and compensated", 'Step="Rejected"'],
-    ["BU1", 'BusinessUnit="BU1"'],
-    ["BU2", 'BusinessUnit="BU2"'],
+    ["Nutrition", 'BusinessUnit="Nutrition"'],
+    ["Devices", 'BusinessUnit="Devices"'],
     ["All document requests", 'WorkflowType="DocumentRequestWorkflow"'],
   ];
   $("views").replaceChildren(...views.map(([label, q]) =>

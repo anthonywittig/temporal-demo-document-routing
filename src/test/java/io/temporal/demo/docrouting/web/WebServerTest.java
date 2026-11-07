@@ -74,7 +74,7 @@ class WebServerTest {
 
   @Test
   void duplicateSubmissionStartsNothingNew() throws Exception {
-    var first = call("POST", "/api/submit", "{\"scenario\":\"bu1-invoice-3000\"}");
+    var first = call("POST", "/api/submit", "{\"scenario\":\"nutrition-invoice-3000\"}");
     assertEquals(200, first.statusCode(), first.body());
     JsonNode started = JSON.readTree(first.body()).get("results").get(0);
     String workflowId = started.get("workflowId").asText();
@@ -92,7 +92,7 @@ class WebServerTest {
 
   @Test
   void erpCallbackBecomesASignalAndCompletesTheRequest() throws Exception {
-    var res = call("POST", "/api/submit", "{\"scenario\":\"bu1-invoice-3000\"}");
+    var res = call("POST", "/api/submit", "{\"scenario\":\"nutrition-invoice-3000\"}");
     String workflowId = JSON.readTree(res.body()).get("results").get(0).get("workflowId").asText();
 
     var cb = call("POST", "/callbacks/erp",
@@ -125,29 +125,29 @@ class WebServerTest {
 
   @Test
   void savingAThresholdWritesTheNextRulesVersion() throws Exception {
-    var res = call("PUT", "/api/rules", "{\"thresholds\":{\"BU2\":5000}}");
+    var res = call("PUT", "/api/rules", "{\"thresholds\":{\"Devices\":5000}}");
     assertEquals(200, res.statusCode(), res.body());
     JsonNode view = JSON.readTree(res.body());
     assertEquals(2, view.get("version").asInt());
-    assertEquals(5000, view.get("thresholds").get("BU2").asLong());
-    assertEquals(5000, view.get("thresholds").get("BU1").asLong(), "untouched unit keeps its threshold");
+    assertEquals(5000, view.get("thresholds").get("Devices").asLong());
+    assertEquals(5000, view.get("thresholds").get("Nutrition").asLong(), "untouched unit keeps its threshold");
 
     JsonNode file = rulesFile();
     assertEquals(2, file.get("version").asInt());
-    assertEquals(5000, file.get("businessUnits").get("BU2").get("humanReviewAbove").asLong());
-    assertEquals("B", file.get("businessUnits").get("BU2").get("default").asText(), "other fields are kept");
-    assertEquals(2, file.get("businessUnits").get("BU2").get("externalChecksFor").size());
+    assertEquals(5000, file.get("businessUnits").get("Devices").get("humanReviewAbove").asLong());
+    assertEquals("B", file.get("businessUnits").get("Devices").get("default").asText(), "other fields are kept");
+    assertEquals(2, file.get("businessUnits").get("Devices").get("externalChecksFor").size());
 
   }
 
   @Test
   void invalidThresholdIsRefusedAndNothingIsWritten() throws Exception {
     String before = Files.readString(dir.resolve("rules.json"));
-    var negative = call("PUT", "/api/rules", "{\"thresholds\":{\"BU1\":-5}}");
+    var negative = call("PUT", "/api/rules", "{\"thresholds\":{\"Nutrition\":-5}}");
     assertEquals(400, negative.statusCode());
     assertTrue(negative.body().contains("must not be negative"), negative.body());
 
-    var text = call("PUT", "/api/rules", "{\"thresholds\":{\"BU1\":\"lots\"}}");
+    var text = call("PUT", "/api/rules", "{\"thresholds\":{\"Nutrition\":\"lots\"}}");
     assertEquals(400, text.statusCode());
     assertTrue(text.body().contains("whole number"), text.body());
 
@@ -159,8 +159,8 @@ class WebServerTest {
 
   @Test
   void resetRestoresDefaultRulesAndReferenceData() throws Exception {
-    call("PUT", "/api/rules", "{\"thresholds\":{\"BU2\":5000}}");
-    call("PUT", "/api/rules", "{\"thresholds\":{\"BU1\":2000}}");
+    call("PUT", "/api/rules", "{\"thresholds\":{\"Devices\":5000}}");
+    call("PUT", "/api/rules", "{\"thresholds\":{\"Nutrition\":2000}}");
     Files.writeString(dir.resolve("reference-data.json"), "{\"costCenters\":[\"CC-10\",\"CC-99\"]}");
     assertEquals(3, rulesFile().get("version").asInt());
 
