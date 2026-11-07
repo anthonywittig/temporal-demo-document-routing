@@ -194,7 +194,7 @@ class DocumentRequestWorkflowTest {
   }
 
   @Test
-  void approveReEvaluatesUnderCurrentRulesWithoutTheCostCheck() throws Exception {
+  void approveReEvaluatesUnderCurrentRulesWithTheApproval() throws Exception {
     start(false);
     fake.route(Route.HUMAN_REVIEW, 1).route(Route.INVOICE, 2); // the rules change while the task is open
     var wf = begin(doc("a2", "Equipment", "invoice", 3000));
@@ -207,7 +207,7 @@ class DocumentRequestWorkflowTest {
     assertEquals(RequestOutcome.COMPLETED, outcome.status());
     assertEquals(Route.INVOICE, outcome.path());
     assertEquals(2, outcome.rulesVersion());
-    assertEquals(List.of(false, true), fake.costApprovedFlags, "the second evaluation must skip the cost check");
+    assertEquals(List.of(false, true), fake.costApprovedFlags, "the second evaluation must carry the approval");
   }
 
   @Test

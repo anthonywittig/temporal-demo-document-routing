@@ -100,9 +100,11 @@ public final class RulesLoader {
   }
 
   /**
-   * As {@link #evaluate(String, String, long)}, but when {@code costApproved} is true a reviewer
-   * has already accepted the cost, so the human-review threshold is skipped and the document type
-   * alone decides the path.
+   * As {@link #evaluate(String, String, long)}, but {@code costApproved} says a reviewer has
+   * already accepted the cost. The approval is only consulted when the rules in force now still
+   * put the cost above the threshold: then it stands in for the review, whichever rules version
+   * asked for it. If the current rules no longer need a review, the document is routed by them
+   * alone, as if no one had been asked.
    */
   public RoutingDecision evaluate(String businessUnit, String docType, long cost, boolean costApproved) {
     Rules rules = current();
@@ -110,15 +112,18 @@ public final class RulesLoader {
     if (unit == null) throw new UnknownBusinessUnitException(businessUnit);
     Route path = pathFor(docType);
 
-    if (!costApproved && cost > unit.humanReviewAbove()) {
-      return new RoutingDecision(
-          Route.HUMAN_REVIEW,
-          "%s: cost %d is above the human-review threshold %d".formatted(businessUnit, cost, unit.humanReviewAbove()),
-          rules.version());
+    String costNote;
+    if (cost > unit.humanReviewAbove()) {
+      if (!costApproved) {
+        return new RoutingDecision(
+            Route.HUMAN_REVIEW,
+            "%s: cost %d is above the human-review threshold %d".formatted(businessUnit, cost, unit.humanReviewAbove()),
+            rules.version());
+      }
+      costNote = "cost %d is above %d, approved by a reviewer".formatted(cost, unit.humanReviewAbove());
+    } else {
+      costNote = "cost %d is within %d".formatted(cost, unit.humanReviewAbove());
     }
-    String costNote = costApproved
-        ? "cost %d approved by a reviewer".formatted(cost)
-        : "cost %d is within %d".formatted(cost, unit.humanReviewAbove());
     String action = path == Route.PURCHASE_ORDER ? "go out as a purchase order" : "are posted to the ERP";
     return new RoutingDecision(
         path, "%s: %s documents %s (%s)".formatted(businessUnit, docType, action, costNote), rules.version());
