@@ -1,5 +1,6 @@
 package io.temporal.demo.docrouting.rules;
 
+import com.fasterxml.jackson.annotation.JsonAlias;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -28,7 +29,8 @@ public final class RulesLoader {
 
   public record UnitRules(
       long humanReviewAbove,
-      List<String> externalChecksFor,
+      // Called externalChecksFor before the path was renamed; older rules files still load.
+      @JsonAlias("externalChecksFor") List<String> purchaseOrderFor,
       @JsonProperty("default") Route defaultPath) {}
 
   public record Rules(int version, Map<String, UnitRules> businessUnits) {}
@@ -85,7 +87,7 @@ public final class RulesLoader {
 
   /**
    * Cost above the unit's human-review threshold goes to a person (HumanReview); otherwise document
-   * types listed for external checks go to ExternalChecks; everything else takes the unit's default path.
+   * types listed for purchase orders go to PurchaseOrder; everything else takes the unit's default path.
    */
   public RoutingDecision evaluate(String businessUnit, String docType, long cost) {
     return evaluate(businessUnit, docType, cost, false);
@@ -110,10 +112,10 @@ public final class RulesLoader {
     String costNote = costApproved
         ? "cost %d approved by a reviewer".formatted(cost)
         : "cost %d is within %d".formatted(cost, unit.humanReviewAbove());
-    if (unit.externalChecksFor().contains(docType)) {
+    if (unit.purchaseOrderFor().contains(docType)) {
       return new RoutingDecision(
-          Route.EXTERNAL_CHECKS,
-          "%s: %s documents need external checks (%s)".formatted(businessUnit, docType, costNote),
+          Route.PURCHASE_ORDER,
+          "%s: %s documents go out as a purchase order (%s)".formatted(businessUnit, docType, costNote),
           rules.version());
     }
     return new RoutingDecision(
@@ -135,7 +137,7 @@ public final class RulesLoader {
         return;
       }
       if (unit.humanReviewAbove() < 0) problems.add(name + ".humanReviewAbove must not be negative");
-      if (unit.externalChecksFor() == null) problems.add(name + ".externalChecksFor is required");
+      if (unit.purchaseOrderFor() == null) problems.add(name + ".purchaseOrderFor is required");
       if (unit.defaultPath() == null) problems.add(name + ".default must be one of " + Route.allValues());
     });
     return problems;

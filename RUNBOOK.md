@@ -4,16 +4,16 @@ This runbook is for presenting the demo. The [README](README.md) explains what i
 
 ## What it shows
 
-A document arrives, is classified, and business-unit rules route it down one of three paths: `HumanReview`, a human task; `ErpPosting`, an ERP posting with an asynchronous confirmation and a notification; or `ExternalChecks`, a cost-center check, a budget reservation and a purchase order sent to the supplier portal. Each document is one `DocumentRequestWorkflow`.
+A document arrives, is classified, and business-unit rules route it down one of three paths: `HumanReview`, a human task; `ErpPosting`, an ERP posting with an asynchronous confirmation and a notification; or `PurchaseOrder`, a cost-center check, a budget reservation and a purchase order sent to the supplier portal. Each document is one `DocumentRequestWorkflow`.
 
 The external systems:
 
 | System | What it does here | Path |
 |---|---|---|
 | **ERP** | Accepts the invoice posting now and confirms it about 4 seconds later, by callback | `ErpPosting` (invoices) |
-| **Cost-center check** | Checks synchronously that the PO's cost center exists in the reference data; 422 if not | `ExternalChecks` (purchase orders) |
-| Budget reservation | Commits the money before the PO goes out; undone if the supplier rejects | `ExternalChecks` |
-| **Supplier portal** | Receives the purchase order; the supplier may reject it | `ExternalChecks` |
+| **Cost-center check** | Checks synchronously that the PO's cost center exists in the reference data; 422 if not | `PurchaseOrder` |
+| Budget reservation | Commits the money before the PO goes out; undone if the supplier rejects | `PurchaseOrder` |
+| **Supplier portal** | Receives the purchase order; the supplier may reject it | `PurchaseOrder` |
 
 The story: an invoice is posted to the ERP, which confirms later, and the requester is notified. A purchase order has its cost center checked and budget reserved, then goes to the supplier portal; if the supplier says no, the budget is released.
 
@@ -137,7 +137,7 @@ Thirty-second version: "A document comes in, is classified, and business-unit ru
 ### 6. The supplier says no; the budget is released
 
 1. Tick **Supplier portal accepts purchase orders**. It now reads **Supplier portal REJECTS purchase orders**.
-2. Click **Equipment · purchase order · $800**. It goes down `ExternalChecks`, and the row ends at step **Rejected**.
+2. Click **Equipment · purchase order · $800**. It goes down `PurchaseOrder`, and the row ends at step **Rejected**.
 3. Open it in the Temporal UI:
    - `CheckCostCenter` passes;
    - `ReserveBudget` runs;

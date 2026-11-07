@@ -46,7 +46,7 @@ public final class RulesEditor {
       UnitRules existing = units.get(unit);
       if (existing == null) throw new InvalidEditException("Unknown business unit " + unit);
       if (threshold == null) throw new InvalidEditException(unit + " needs a threshold");
-      units.put(unit, new UnitRules(threshold, existing.externalChecksFor(), existing.defaultPath()));
+      units.put(unit, new UnitRules(threshold, existing.purchaseOrderFor(), existing.defaultPath()));
     });
     Rules next = new Rules(current.version() + 1, units);
     List<String> problems = RulesLoader.validate(next);

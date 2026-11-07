@@ -28,14 +28,14 @@ public interface DocumentActivities {
   /** Every path: tell the requester the outcome. */
   void notifyRequester(DocumentRequest doc, String message);
 
-  /** ExternalChecks: check the cost center. Fails without retry if it is unknown. */
+  /** PurchaseOrder: check the cost center. Fails without retry if it is unknown. */
   void checkCostCenter(DocumentRequest doc);
 
   void reserveBudget(DocumentRequest doc);
 
   void releaseBudget(DocumentRequest doc);
 
-  /** ExternalChecks: send the purchase order to the supplier portal. Fails without retry if the supplier rejects it. */
+  /** PurchaseOrder: send the purchase order to the supplier portal. Fails without retry if the supplier rejects it. */
   void sendPurchaseOrder(DocumentRequest doc);
 
   /** v2 only: archive the processed document. */

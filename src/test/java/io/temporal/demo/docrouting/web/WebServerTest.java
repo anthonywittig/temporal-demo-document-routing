@@ -136,7 +136,7 @@ class WebServerTest {
     assertEquals(2, file.get("version").asInt());
     assertEquals(5000, file.get("businessUnits").get("Equipment").get("humanReviewAbove").asLong());
     assertEquals("ErpPosting", file.get("businessUnits").get("Equipment").get("default").asText(), "other fields are kept");
-    assertEquals(2, file.get("businessUnits").get("Equipment").get("externalChecksFor").size());
+    assertEquals(2, file.get("businessUnits").get("Equipment").get("purchaseOrderFor").size());
 
   }
 
