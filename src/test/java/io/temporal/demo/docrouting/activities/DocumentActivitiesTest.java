@@ -74,7 +74,7 @@ class DocumentActivitiesTest {
     String type = activities.classify(SERVICES_INVOICE);
     assertEquals("invoice", type);
     var decision = activities.evaluateRules(SERVICES_INVOICE, type, false);
-    assertEquals(Route.B, decision.path());
+    assertEquals(Route.ERP_POSTING, decision.path());
     assertEquals(1, decision.rulesVersion());
   }
 

@@ -84,8 +84,8 @@ public final class RulesLoader {
   }
 
   /**
-   * Cost above the unit's human-review threshold goes to a person (A); otherwise document types
-   * listed for external checks go to C; everything else takes the unit's default path.
+   * Cost above the unit's human-review threshold goes to a person (HumanReview); otherwise document
+   * types listed for external checks go to ExternalChecks; everything else takes the unit's default path.
    */
   public RoutingDecision evaluate(String businessUnit, String docType, long cost) {
     return evaluate(businessUnit, docType, cost, false);
@@ -103,7 +103,7 @@ public final class RulesLoader {
 
     if (!costApproved && cost > unit.humanReviewAbove()) {
       return new RoutingDecision(
-          Route.A,
+          Route.HUMAN_REVIEW,
           "%s: cost %d is above the human-review threshold %d".formatted(businessUnit, cost, unit.humanReviewAbove()),
           rules.version());
     }
@@ -112,7 +112,7 @@ public final class RulesLoader {
         : "cost %d is within %d".formatted(cost, unit.humanReviewAbove());
     if (unit.externalChecksFor().contains(docType)) {
       return new RoutingDecision(
-          Route.C,
+          Route.EXTERNAL_CHECKS,
           "%s: %s documents need external checks (%s)".formatted(businessUnit, docType, costNote),
           rules.version());
     }
@@ -136,7 +136,7 @@ public final class RulesLoader {
       }
       if (unit.humanReviewAbove() < 0) problems.add(name + ".humanReviewAbove must not be negative");
       if (unit.externalChecksFor() == null) problems.add(name + ".externalChecksFor is required");
-      if (unit.defaultPath() == null) problems.add(name + ".default must be one of A, B, C");
+      if (unit.defaultPath() == null) problems.add(name + ".default must be one of " + Route.allValues());
     });
     return problems;
   }

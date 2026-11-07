@@ -36,7 +36,7 @@ class WebServerTest {
   @TempDir Path dir;
   TestWorkflowEnvironment env;
   WebServer web;
-  final FakeActivities fake = new FakeActivities().route(Route.B, 1);
+  final FakeActivities fake = new FakeActivities().route(Route.ERP_POSTING, 1);
 
   @BeforeEach
   void setUp() throws Exception {
@@ -135,7 +135,7 @@ class WebServerTest {
     JsonNode file = rulesFile();
     assertEquals(2, file.get("version").asInt());
     assertEquals(5000, file.get("businessUnits").get("Equipment").get("humanReviewAbove").asLong());
-    assertEquals("B", file.get("businessUnits").get("Equipment").get("default").asText(), "other fields are kept");
+    assertEquals("ErpPosting", file.get("businessUnits").get("Equipment").get("default").asText(), "other fields are kept");
     assertEquals(2, file.get("businessUnits").get("Equipment").get("externalChecksFor").size());
 
   }

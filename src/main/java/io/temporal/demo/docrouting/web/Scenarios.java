@@ -18,11 +18,11 @@ public final class Scenarios {
   public static final String DUPLICATE = "duplicate";
 
   public static final List<Scenario> ALL = List.of(
-      new Scenario("services-invoice-3000", "Services · invoice · $3,000", "Path B: posted to the ERP", "Services", "invoice", 3000, "CC-10", 1),
+      new Scenario("services-invoice-3000", "Services · invoice · $3,000", "Posted to the ERP", "Services", "invoice", 3000, "CC-10", 1),
       new Scenario("equipment-invoice-3000", "Equipment · invoice · $3,000", "Same cost, Equipment: human task", "Equipment", "invoice", 3000, "CC-20", 1),
       new Scenario("services-invoice-12000", "Services · invoice · $12,000", "Above the Services threshold: human task", "Services", "invoice", 12000, "CC-10", 1),
-      new Scenario("equipment-po-800", "Equipment · purchase order · $800", "Path C: cost-center check, then the supplier", "Equipment", "purchase-order", 800, "CC-30", 1),
-      new Scenario("cc99-batch", "3 × cost center CC-99", "Path C: an unknown cost center", "Equipment", "purchase-order", 800, "CC-99", 3));
+      new Scenario("equipment-po-800", "Equipment · purchase order · $800", "External checks: cost center, then the supplier", "Equipment", "purchase-order", 800, "CC-30", 1),
+      new Scenario("cc99-batch", "3 × cost center CC-99", "External checks: an unknown cost center", "Equipment", "purchase-order", 800, "CC-99", 3));
 
   public static Scenario find(String id) {
     return ALL.stream().filter(s -> s.id().equals(id)).findFirst().orElse(null);

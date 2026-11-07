@@ -4,12 +4,12 @@
     "Services": {
       "humanReviewAbove": 5000,
       "externalChecksFor": ["purchase-order"],
-      "default": "B"
+      "default": "ErpPosting"
     },
     "Equipment": {
       "humanReviewAbove": 1000,
       "externalChecksFor": ["purchase-order", "contract"],
-      "default": "B"
+      "default": "ErpPosting"
     }
   }
 }

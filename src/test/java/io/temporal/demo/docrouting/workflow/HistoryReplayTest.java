@@ -38,7 +38,7 @@ class HistoryReplayTest {
   static final WorkflowSettings V1 = new WorkflowSettings(Duration.ofSeconds(60), Duration.ofMinutes(2), false);
 
   @ParameterizedTest
-  @ValueSource(strings = {"v1-path-a.json", "v1-path-b.json", "v1-path-c-rejected.json"})
+  @ValueSource(strings = {"v1-human-review.json", "v1-erp-posting.json", "v1-external-checks-rejected.json"})
   void v1HistoriesReplayAgainstCurrentCode(String fixture) throws Exception {
     String json;
     try (InputStream in = getClass().getResourceAsStream("/histories/" + fixture)) {
@@ -60,7 +60,7 @@ class HistoryReplayTest {
   @Test
   void v2CodeCannotReplayV1History() throws Exception {
     String json;
-    try (InputStream in = getClass().getResourceAsStream("/histories/v1-path-b.json")) {
+    try (InputStream in = getClass().getResourceAsStream("/histories/v1-erp-posting.json")) {
       json = new String(in.readAllBytes(), StandardCharsets.UTF_8);
     }
     WorkflowSettings v2 = new WorkflowSettings(V1.slaDuration(), V1.callbackTimeout(), true);
@@ -77,15 +77,15 @@ class HistoryReplayTest {
   @EnabledIfSystemProperty(named = "record", matches = "true")
   void recordFixtures() throws Exception {
     Files.createDirectories(FIXTURES);
-    record("v1-path-a.json", Route.A, false, (wf, client) -> {
+    record("v1-human-review.json", Route.HUMAN_REVIEW, false, (wf, client) -> {
       awaitStep(wf, Steps.HUMAN_TASK);
-      wf.review(new ReviewDecision("rec-a-r1", ReviewAction.REJECT, "Sam", "recorded"));
+      wf.review(new ReviewDecision("rec-humanreview-r1", ReviewAction.REJECT, "Sam", "recorded"));
     });
-    record("v1-path-b.json", Route.B, false, (wf, client) -> {
+    record("v1-erp-posting.json", Route.ERP_POSTING, false, (wf, client) -> {
       awaitStep(wf, Steps.AWAIT_ERP_CONFIRMATION);
-      wf.erpPostingConfirmed(new ErpConfirmation("A-rec", "now"));
+      wf.erpPostingConfirmed(new ErpConfirmation("ERP-rec", "now"));
     });
-    record("v1-path-c-rejected.json", Route.C, true, (wf, client) -> {});
+    record("v1-external-checks-rejected.json", Route.EXTERNAL_CHECKS, true, (wf, client) -> {});
   }
 
   interface Drive {
@@ -111,7 +111,7 @@ class HistoryReplayTest {
       worker.registerActivitiesImplementations(fake);
       env.start();
 
-      String id = "rec-" + route.name().toLowerCase();
+      String id = "rec-" + route.value().toLowerCase();
       WorkflowClient client = env.getWorkflowClient();
       DocumentRequestWorkflow wf = client.newWorkflowStub(DocumentRequestWorkflow.class,
           WorkflowOptions.newBuilder().setTaskQueue(QUEUE).setWorkflowId(DocumentRequestWorkflow.workflowId(id)).build());

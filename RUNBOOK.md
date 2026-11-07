@@ -4,16 +4,16 @@ This runbook is for presenting the demo. The [README](README.md) explains what i
 
 ## What it shows
 
-A document arrives, is classified, and business-unit rules route it down one of three paths: a human task (A), an ERP posting with an asynchronous confirmation and a notification (B), or a cost-center check, a budget reservation and a purchase order sent to the supplier portal (C). Each document is one `DocumentRequestWorkflow`.
+A document arrives, is classified, and business-unit rules route it down one of three paths: `HumanReview`, a human task; `ErpPosting`, an ERP posting with an asynchronous confirmation and a notification; or `ExternalChecks`, a cost-center check, a budget reservation and a purchase order sent to the supplier portal. Each document is one `DocumentRequestWorkflow`.
 
 The external systems:
 
 | System | What it does here | Path |
 |---|---|---|
-| **ERP** | Accepts the invoice posting now and confirms it about 4 seconds later, by callback | B (invoices) |
-| **Cost-center check** | Checks synchronously that the PO's cost center exists in the reference data; 422 if not | C (purchase orders) |
-| Budget reservation | Commits the money before the PO goes out; undone if the supplier rejects | C |
-| **Supplier portal** | Receives the purchase order; the supplier may reject it | C |
+| **ERP** | Accepts the invoice posting now and confirms it about 4 seconds later, by callback | `ErpPosting` (invoices) |
+| **Cost-center check** | Checks synchronously that the PO's cost center exists in the reference data; 422 if not | `ExternalChecks` (purchase orders) |
+| Budget reservation | Commits the money before the PO goes out; undone if the supplier rejects | `ExternalChecks` |
+| **Supplier portal** | Receives the purchase order; the supplier may reject it | `ExternalChecks` |
 
 The story: an invoice is posted to the ERP, which confirms later, and the requester is notified. A purchase order has its cost center checked and budget reserved, then goes to the supplier portal; if the supplier says no, the budget is released.
 
@@ -71,7 +71,7 @@ Thirty-second version: "A document comes in, is classified, and business-unit ru
 
 | Beat | Minutes | Compress if short on time |
 |---|---|---|
-| 1. A document takes path B | 6 | |
+| 1. A document is posted to the ERP | 6 | |
 | 2. The same document, twice | 3 | yes, fold into beat 1 |
 | 3. Same cost, different unit; change a rule live | 10 | |
 | 4. A person approves it; the SLA runs out | 10 | |
@@ -82,13 +82,13 @@ Thirty-second version: "A document comes in, is classified, and business-unit ru
 | 9. The operations view | 7 | yes, show only two filters |
 | **Total** | **71** | leaves about 17 minutes for questions |
 
-### 1. A document takes path B
+### 1. A document is posted to the ERP
 
 1. Click **Services · invoice · $3,000**. A toast says "Started D…".
-2. Within about 5 seconds, the row in **Recent requests** shows path **B**, step **Completed**, version **v1**.
+2. Within about 5 seconds, the row in **Recent requests** shows path **ErpPosting**, step **Completed**, version **v1**.
 3. Click the document ID. In the Temporal UI's Event History, point out:
    - `Classify`;
-   - `EvaluateRules`, whose result shows path B, the reason ("cost 3000 is within 5000"), and `rulesVersion: 1`;
+   - `EvaluateRules`, whose result shows path `ErpPosting`, the reason ("cost 3000 is within 5000"), and `rulesVersion: 1`;
    - `PostInvoiceToErp`;
    - the timer **Wait for ERP confirmation (2m)** starts: the deadline for the ERP to answer;
    - the **`ErpPostingConfirmed` Signal**, about 4 seconds later, and the timer is canceled;
@@ -105,7 +105,7 @@ Thirty-second version: "A document comes in, is classified, and business-unit ru
 1. Click **Equipment · invoice · $3,000**. It appears in the **Reviewer inbox** with the reason "Equipment: cost 3000 is above the human-review threshold 1000", rules **v1**, and an SLA countdown. **Leave it there**: it's the in-flight request for this beat and beat 4.
 2. Say: "Same cost as the Services invoice, different business unit, different path. Each business unit has its own threshold. It comes from rules held outside the workflow, which stand in for Drools or any rules engine."
 3. In the **Routing rules** card, change Equipment to `5000` and click **Save as v2**. A toast says "Saved rules v2: the next evaluation uses them", and the card and the top bar show **rules v2**. (The card writes `data/rules.json`. Editing that file by hand does the same thing: set `"version": 2` and the Equipment `"humanReviewAbove"` to `5000`, and save.)
-4. Click **Equipment · invoice · $3,000** again. This time it goes straight to path **B** and completes, with rules **v2** on its row.
+4. Click **Equipment · invoice · $3,000** again. This time it goes straight to path **ErpPosting** and completes, with rules **v2** on its row.
 5. Point at the inbox. The first Equipment request is still waiting, still on rules **v1**.
 6. Say: "No deploy. The rules live outside the workflow, in a file this card writes, standing in for your rules engine and its admin screen. The next evaluation read the new version. The request already in flight keeps the decision it made, because that decision and its rules version are in its history. It won't silently change route under someone."
 7. Optional, to show validation: in the card, type `-5` for a threshold and save. The toast refuses it ("must not be negative"), and the version doesn't change. A broken hand edit to `data/rules.json` (delete a closing brace) is rejected too: the rules badge turns amber, and a banner says "rules.json edit rejected; still using v2". Rollback is the same move as a change: save the previous threshold, which becomes the next version.
@@ -113,7 +113,7 @@ Thirty-second version: "A document comes in, is classified, and business-unit ru
 ### 4. A person approves it; the SLA runs out
 
 1. In the inbox, on the Equipment request from beat 3, type a comment and click **Approve**. A toast says "Approved by Sam Chen: recorded by Temporal".
-2. The request goes back through the rules in force now, **v2**, this time with the cost check waived, so it takes the Equipment default path, B, and completes. Open it in the Temporal UI: there are two `EvaluateRules` results, v1 → A ("cost 3000 is above the human-review threshold 1000") and then v2 → B ("cost 3000 approved by a reviewer"), with the Update `Review` between them carrying the reviewer and the comment.
+2. The request goes back through the rules in force now, **v2**, this time with the cost check waived, so it takes the Equipment default path, `ErpPosting`, and completes. Open it in the Temporal UI: there are two `EvaluateRules` results, v1 → `HumanReview` ("cost 3000 is above the human-review threshold 1000") and then v2 → `ErpPosting` ("cost 3000 approved by a reviewer"), with the Update `Review` between them carrying the reviewer and the comment.
 3. Say: "Approval is a loop in code, not a special feature. The request re-runs the rules in force now, minus the check the reviewer just signed off: it arrived under v1, and its second decision was made by v2. Whoever opens the history sees both decisions, which rules made each one, and who made the call in between."
 4. Click **Services · invoice · $12,000**. It lands in the inbox (above the Services threshold of 5000). Click **Waiting on a person** under **Temporal UI views** to show the same list in the Temporal UI.
 5. Let the SLA run out while you talk (60 seconds by default). The row turns red with **SLA breached**. In the Temporal UI, **SLA breached** lists it, and the request's timeline shows the fired **Review SLA (1m)** timer.
@@ -137,7 +137,7 @@ Thirty-second version: "A document comes in, is classified, and business-unit ru
 ### 6. The supplier says no; the budget is released
 
 1. Tick **Supplier portal accepts purchase orders**. It now reads **Supplier portal REJECTS purchase orders**.
-2. Click **Equipment · purchase order · $800**. It goes down path C, and the row ends at step **Rejected**.
+2. Click **Equipment · purchase order · $800**. It goes down `ExternalChecks`, and the row ends at step **Rejected**.
 3. Open it in the Temporal UI:
    - `CheckCostCenter` passes;
    - `ReserveBudget` runs;
@@ -173,7 +173,7 @@ The Services $12,000 request from beat 4 should still be open in the inbox, on v
 1. In the fifth terminal: `make worker BUILD_ID=v2`. It starts polling. v1 is still current, so new requests still go to v1.
 2. `make promote BUILD_ID=v2`. It prints "Successfully set the current worker deployment version".
 3. Click **Services · invoice · $3,000**. Its row shows version **v2**. In the Temporal UI, its history ends with an `ArchiveDocument` step that v1 doesn't have.
-4. In the inbox, **Approve** the open $12,000 request. It goes on down path B on v1 code and completes. Its row shows **v1**, and its history has no `ArchiveDocument` step.
+4. In the inbox, **Approve** the open $12,000 request. It goes on down `ErpPosting` on v1 code and completes. Its row shows **v1**, and its history has no `ArchiveDocument` step.
 5. Say: "Two versions of the workflow ran side by side. Each request is pinned to the version it started on. v2 adds a step, and replaying an old history against new code is exactly what breaks naïve deploys. Old requests finish on old code, new requests get new code, and nobody had to stop anything."
 6. Show it draining:
 
@@ -218,7 +218,7 @@ Every side-effecting call also sends `Idempotency-Key: <workflowId>/<activity ty
 ```java
 RoutingDecision route = activities.evaluateRules(doc, docType, costApproved);
 Workflow.upsertTypedSearchAttributes(
-    PATH.valueSet(route.path().name()), RULES_VERSION.valueSet((long) route.rulesVersion()));
+    PATH.valueSet(route.path().value()), RULES_VERSION.valueSet((long) route.rulesVersion()));
 ```
 
 The rules file is read on every evaluation and validated, and the last good version is kept: [`RulesLoader.java` lines 55–76 and 90–123](src/main/java/io/temporal/demo/docrouting/rules/RulesLoader.java#L55-L123). Swap this class for a Drools or decision-table call and nothing else changes.
@@ -338,10 +338,10 @@ WorkerDeploymentOptions.newBuilder()
 |---|---|---|
 | Banner "Reconnecting to Temporal…" | The web app can't reach the dev server | Start `make temporal`, then refresh |
 | **External systems** card is red, "unreachable" | The systems process isn't running | `make systems` |
-| A path B request sits at **PostToErp** with attempts climbing | The **ERP is DOWN (503)** toggle is still on, perhaps from beat 5 | Untick it; the next retry succeeds |
+| An `ErpPosting` request sits at **PostToErp** with attempts climbing | The **ERP is DOWN (503)** toggle is still on, perhaps from beat 5 | Untick it; the next retry succeeds |
 | A new request stays at step **Received** | No worker is running, or the deployment has no current version | `make worker`. If it's running, check `temporal worker deployment describe --name document-routing --disable-config-file` and `make promote BUILD_ID=v1` |
 | Toast "No worker has accepted the decision yet…" | The worker is stopped | Start `make worker`. The decision is applied when it starts; clicking again is safe |
-| A path B request sits at **AwaitErpConfirmation** | The ERP's callback can't reach the web app | Keep `make web` running; the ERP retries the callback. After `CALLBACK_TIMEOUT` (2 minutes) the request fails with "The ERP did not confirm the posting" |
+| An `ErpPosting` request sits at **AwaitErpConfirmation** | The ERP's callback can't reach the web app | Keep `make web` running; the ERP retries the callback. After `CALLBACK_TIMEOUT` (2 minutes) the request fails with "The ERP did not confirm the posting" |
 | A request shows **Failed** at step **PostToErp** (or another external step) | The systems process was down longer than the retry bound, about 3 minutes (20 attempts) | Start `make systems`, then replay as in beat 7: `temporal workflow reset --disable-config-file --query 'ExecutionStatus="Failed" AND Step="PostToErp"' --type FirstWorkflowTask --reason "ERP back" --yes` |
 | The page shows **rules v2** (or later) right after starting | An earlier rehearsal's edits are still in `data/` | Click **Reset demo data** |
 | Rules badge is amber and a banner says the edit was rejected | `data/rules.json` doesn't parse or validate | Fix the file, or save from the **Routing rules** card, which writes a valid file; the banner names the problem. The last good version stays in force meanwhile |
