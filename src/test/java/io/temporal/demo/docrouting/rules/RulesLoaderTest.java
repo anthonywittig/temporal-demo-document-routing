@@ -18,8 +18,8 @@ class RulesLoaderTest {
   static final String V1 = """
       { "version": 1,
         "businessUnits": {
-          "Nutrition": { "humanReviewAbove": 5000, "externalChecksFor": ["purchase-order"], "default": "B" },
-          "Devices": { "humanReviewAbove": 1000, "externalChecksFor": ["purchase-order", "contract"], "default": "B" } } }
+          "Services": { "humanReviewAbove": 5000, "externalChecksFor": ["purchase-order"], "default": "B" },
+          "Equipment": { "humanReviewAbove": 1000, "externalChecksFor": ["purchase-order", "contract"], "default": "B" } } }
       """;
 
   @BeforeEach
@@ -37,28 +37,28 @@ class RulesLoaderTest {
 
   @Test
   void sameCostRoutesDifferentlyPerBusinessUnit() {
-    var nutrition = loader.evaluate("Nutrition", "invoice", 3000);
-    var devices = loader.evaluate("Devices", "invoice", 3000);
-    assertEquals(Route.B, nutrition.path());
-    assertEquals(Route.A, devices.path());
-    assertEquals(1, nutrition.rulesVersion());
-    assertTrue(devices.reason().contains("1000"), devices.reason());
+    var services = loader.evaluate("Services", "invoice", 3000);
+    var equipment = loader.evaluate("Equipment", "invoice", 3000);
+    assertEquals(Route.B, services.path());
+    assertEquals(Route.A, equipment.path());
+    assertEquals(1, services.rulesVersion());
+    assertTrue(equipment.reason().contains("1000"), equipment.reason());
   }
 
   @Test
   void eachPath() {
-    assertEquals(Route.A, loader.evaluate("Nutrition", "invoice", 12000).path());
-    assertEquals(Route.B, loader.evaluate("Nutrition", "invoice", 300).path());
-    assertEquals(Route.C, loader.evaluate("Devices", "purchase-order", 800).path());
+    assertEquals(Route.A, loader.evaluate("Services", "invoice", 12000).path());
+    assertEquals(Route.B, loader.evaluate("Services", "invoice", 300).path());
+    assertEquals(Route.C, loader.evaluate("Equipment", "purchase-order", 800).path());
   }
 
   @Test
   void approvedCostSkipsTheHumanReviewThreshold() {
-    var approvedInvoice = loader.evaluate("Nutrition", "invoice", 12000, true);
+    var approvedInvoice = loader.evaluate("Services", "invoice", 12000, true);
     assertEquals(Route.B, approvedInvoice.path());
     assertTrue(approvedInvoice.reason().contains("approved by a reviewer"), approvedInvoice.reason());
-    assertEquals(Route.C, loader.evaluate("Devices", "purchase-order", 12000, true).path());
-    assertEquals(Route.A, loader.evaluate("Nutrition", "invoice", 12000, false).path());
+    assertEquals(Route.C, loader.evaluate("Equipment", "purchase-order", 12000, true).path());
+    assertEquals(Route.A, loader.evaluate("Services", "invoice", 12000, false).path());
   }
 
   @Test
@@ -69,9 +69,9 @@ class RulesLoaderTest {
 
   @Test
   void liveEditTakesEffectOnNextEvaluation() throws IOException {
-    assertEquals(Route.B, loader.evaluate("Nutrition", "invoice", 3000).path());
+    assertEquals(Route.B, loader.evaluate("Services", "invoice", 3000).path());
     Files.writeString(file, V1.replace("\"version\": 1", "\"version\": 2").replace("5000", "2000"));
-    var decision = loader.evaluate("Nutrition", "invoice", 3000);
+    var decision = loader.evaluate("Services", "invoice", 3000);
     assertEquals(Route.A, decision.path());
     assertEquals(2, decision.rulesVersion());
   }
@@ -90,7 +90,7 @@ class RulesLoaderTest {
     loader.current();
     Files.writeString(file, V1.replace("\"version\": 1", "\"version\": 2").replace("5000", "-5"));
     assertEquals(1, loader.current().version());
-    assertTrue(loader.status().lastRejection().contains("Nutrition.humanReviewAbove"));
+    assertTrue(loader.status().lastRejection().contains("Services.humanReviewAbove"));
   }
 
   @Test
@@ -106,7 +106,7 @@ class RulesLoaderTest {
     Files.writeString(file, V1.replace("\"version\": 1", "\"version\": 2").replace("5000", "2000"));
     assertEquals(2, loader.current().version());
     Files.writeString(file, V1);
-    var decision = loader.evaluate("Nutrition", "invoice", 3000);
+    var decision = loader.evaluate("Services", "invoice", 3000);
     assertEquals(1, decision.rulesVersion());
     assertEquals(Route.B, decision.path());
   }

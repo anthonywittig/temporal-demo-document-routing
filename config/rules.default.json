@@ -1,12 +1,12 @@
 {
   "version": 1,
   "businessUnits": {
-    "Nutrition": {
+    "Services": {
       "humanReviewAbove": 5000,
       "externalChecksFor": ["purchase-order"],
       "default": "B"
     },
-    "Devices": {
+    "Equipment": {
       "humanReviewAbove": 1000,
       "externalChecksFor": ["purchase-order", "contract"],
       "default": "B"

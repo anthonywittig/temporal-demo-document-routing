@@ -57,7 +57,7 @@ Keep the fifth terminal free for beat 7's reset command and beat 8's second work
 A healthy start shows the following on http://localhost:8080:
 - the top bar shows **rules v1** and `task queue · document-routing`;
 - five document chips, plus **Resubmit last document**;
-- the **Routing rules** card shows **v1**, with Nutrition at 5000 and Devices at 1000;
+- the **Routing rules** card shows **v1**, with Services at 5000 and Equipment at 1000;
 - **ERP is up** and **Supplier portal accepts purchase orders**;
 - an empty **Reviewer inbox** ("No open tasks.") and an empty **Recent requests** list.
 
@@ -84,7 +84,7 @@ Thirty-second version: "A document comes in, is classified, and business-unit ru
 
 ### 1. A document takes path B
 
-1. Click **Nutrition · invoice · $3,000**. A toast says "Started D…".
+1. Click **Services · invoice · $3,000**. A toast says "Started D…".
 2. Within about 5 seconds, the row in **Recent requests** shows path **B**, step **Completed**, version **v1**.
 3. Click the document ID. In the Temporal UI's Event History, point out:
    - `Classify`;
@@ -102,30 +102,30 @@ Thirty-second version: "A document comes in, is classified, and business-unit ru
 
 ### 3. Same cost, different unit; change a rule live
 
-1. Click **Devices · invoice · $3,000**. It appears in the **Reviewer inbox** with the reason "Devices: cost 3000 is above the human-review threshold 1000", rules **v1**, and an SLA countdown. **Leave it there**: it's the in-flight request for this beat and beat 4.
-2. Say: "Same cost as the Nutrition invoice, different business unit, different path. Each business unit has its own threshold. It comes from rules held outside the workflow, which stand in for Drools or any rules engine."
-3. In the **Routing rules** card, change Devices to `5000` and click **Save as v2**. A toast says "Saved rules v2: the next evaluation uses them", and the card and the top bar show **rules v2**. (The card writes `data/rules.json`. Editing that file by hand does the same thing: set `"version": 2` and the Devices `"humanReviewAbove"` to `5000`, and save.)
-4. Click **Devices · invoice · $3,000** again. This time it goes straight to path **B** and completes, with rules **v2** on its row.
-5. Point at the inbox. The first Devices request is still waiting, still on rules **v1**.
+1. Click **Equipment · invoice · $3,000**. It appears in the **Reviewer inbox** with the reason "Equipment: cost 3000 is above the human-review threshold 1000", rules **v1**, and an SLA countdown. **Leave it there**: it's the in-flight request for this beat and beat 4.
+2. Say: "Same cost as the Services invoice, different business unit, different path. Each business unit has its own threshold. It comes from rules held outside the workflow, which stand in for Drools or any rules engine."
+3. In the **Routing rules** card, change Equipment to `5000` and click **Save as v2**. A toast says "Saved rules v2: the next evaluation uses them", and the card and the top bar show **rules v2**. (The card writes `data/rules.json`. Editing that file by hand does the same thing: set `"version": 2` and the Equipment `"humanReviewAbove"` to `5000`, and save.)
+4. Click **Equipment · invoice · $3,000** again. This time it goes straight to path **B** and completes, with rules **v2** on its row.
+5. Point at the inbox. The first Equipment request is still waiting, still on rules **v1**.
 6. Say: "No deploy. The rules live outside the workflow, in a file this card writes, standing in for your rules engine and its admin screen. The next evaluation read the new version. The request already in flight keeps the decision it made, because that decision and its rules version are in its history. It won't silently change route under someone."
 7. Optional, to show validation: in the card, type `-5` for a threshold and save. The toast refuses it ("must not be negative"), and the version doesn't change. A broken hand edit to `data/rules.json` (delete a closing brace) is rejected too: the rules badge turns amber, and a banner says "rules.json edit rejected; still using v2". Rollback is the same move as a change: save the previous threshold, which becomes the next version.
 
 ### 4. A person approves it; the SLA runs out
 
-1. In the inbox, on the Devices request from beat 3, type a comment and click **Approve**. A toast says "Approved by Sam Chen: recorded by Temporal".
-2. The request goes back through the rules in force now, **v2**, this time with the cost check waived, so it takes the Devices default path, B, and completes. Open it in the Temporal UI: there are two `EvaluateRules` results, v1 → A ("cost 3000 is above the human-review threshold 1000") and then v2 → B ("cost 3000 approved by a reviewer"), with the Update `Review` between them carrying the reviewer and the comment.
+1. In the inbox, on the Equipment request from beat 3, type a comment and click **Approve**. A toast says "Approved by Sam Chen: recorded by Temporal".
+2. The request goes back through the rules in force now, **v2**, this time with the cost check waived, so it takes the Equipment default path, B, and completes. Open it in the Temporal UI: there are two `EvaluateRules` results, v1 → A ("cost 3000 is above the human-review threshold 1000") and then v2 → B ("cost 3000 approved by a reviewer"), with the Update `Review` between them carrying the reviewer and the comment.
 3. Say: "Approval is a loop in code, not a special feature. The request re-runs the rules in force now, minus the check the reviewer just signed off: it arrived under v1, and its second decision was made by v2. Whoever opens the history sees both decisions, which rules made each one, and who made the call in between."
-4. Click **Nutrition · invoice · $12,000**. It lands in the inbox (above Nutrition's 5000 threshold). Click **Waiting on a person** under **Temporal UI views** to show the same list in the Temporal UI.
+4. Click **Services · invoice · $12,000**. It lands in the inbox (above the Services threshold of 5000). Click **Waiting on a person** under **Temporal UI views** to show the same list in the Temporal UI.
 5. Let the SLA run out while you talk (60 seconds by default). The row turns red with **SLA breached**. In the Temporal UI, **SLA breached** lists it, and the request's timeline shows the fired **Review SLA (1m)** timer.
 6. Say: "The SLA is a durable timer. Breaching it flags the request; it doesn't cancel it. A late decision still counts. In production the flag is what you alert on."
 7. **Don't approve or reject this one.** It's the open v1 request for beat 8.
 8. Optional, for a stale click: if anyone asks about double-clicks, act on a task twice. The second click says "Task … is no longer open". The Update's validator rejected it, and nothing was written to history.
-9. Optional, for the other answer: click **Nutrition · invoice · $12,000** again and **Reject** the new task (not the breached one). Its row in **Recent requests** reads **Rejected**, at step **Rejected**. In its history, the Update `Review` is followed only by `NotifyRequester`: no ERP posting, no archive.
+9. Optional, for the other answer: click **Services · invoice · $12,000** again and **Reject** the new task (not the breached one). Its row in **Recent requests** reads **Rejected**, at step **Rejected**. In its history, the Update `Review` is followed only by `NotifyRequester`: no ERP posting, no archive.
 
 ### 5. Take the ERP and the worker away
 
 1. Tick **ERP is up**. It now reads **ERP is DOWN (503)**.
-2. Click **Nutrition · invoice · $3,000**. The row stays at step **PostToErp**, status **Running**.
+2. Click **Services · invoice · $3,000**. The row stays at step **PostToErp**, status **Running**.
 3. Open it in the Temporal UI. Under **Pending Activities**, `PostInvoiceToErp` shows attempt 3, 4, 5… with `POST /erp/invoices returned HTTP 503: The ERP is unavailable` as the last failure.
 4. Say: "The ERP is down. The workflow isn't failing; it's retrying with exponential backoff, 1, 2, 4, up to 10 seconds, for about three minutes. Other requests aren't blocked behind this one. There's no queue head to get stuck."
 5. Press `Ctrl-C` in the `make worker` terminal. Now nothing is running the workflow either.
@@ -137,7 +137,7 @@ Thirty-second version: "A document comes in, is classified, and business-unit ru
 ### 6. The supplier says no; the budget is released
 
 1. Tick **Supplier portal accepts purchase orders**. It now reads **Supplier portal REJECTS purchase orders**.
-2. Click **Devices · purchase order · $800**. It goes down path C, and the row ends at step **Rejected**.
+2. Click **Equipment · purchase order · $800**. It goes down path C, and the row ends at step **Rejected**.
 3. Open it in the Temporal UI:
    - `CheckCostCenter` passes;
    - `ReserveBudget` runs;
@@ -168,11 +168,11 @@ Thirty-second version: "A document comes in, is classified, and business-unit ru
 
 ### 8. Ship v2 while v1 requests are still open
 
-The Nutrition $12,000 request from beat 4 should still be open in the inbox, on v1.
+The Services $12,000 request from beat 4 should still be open in the inbox, on v1.
 
 1. In the fifth terminal: `make worker BUILD_ID=v2`. It starts polling. v1 is still current, so new requests still go to v1.
 2. `make promote BUILD_ID=v2`. It prints "Successfully set the current worker deployment version".
-3. Click **Nutrition · invoice · $3,000**. Its row shows version **v2**. In the Temporal UI, its history ends with an `ArchiveDocument` step that v1 doesn't have.
+3. Click **Services · invoice · $3,000**. Its row shows version **v2**. In the Temporal UI, its history ends with an `ArchiveDocument` step that v1 doesn't have.
 4. In the inbox, **Approve** the open $12,000 request. It goes on down path B on v1 code and completes. Its row shows **v1**, and its history has no `ArchiveDocument` step.
 5. Say: "Two versions of the workflow ran side by side. Each request is pinned to the version it started on. v2 adds a step, and replaying an old history against new code is exactly what breaks naïve deploys. Old requests finish on old code, new requests get new code, and nobody had to stop anything."
 6. Show it draining:
@@ -189,7 +189,7 @@ The Nutrition $12,000 request from beat 4 should still be open in the inbox, on 
 1. In the Temporal UI, use the links from the page:
    - **Waiting on a person**: the count at the top answers "how many requests are at this step";
    - **SLA breached**: "which ones are late";
-   - **Nutrition** and **Devices**: per business unit.
+   - **Services** and **Equipment**: per business unit.
 2. Open any request and switch the Event History to **Timeline**. Say: "This is the 'where am I' view for UAT: completed steps, the current step, and how long each took. The `Step` search attribute is what the counts are built on."
 3. Say: "For dashboards and alerting, the SDK and the service emit metrics through OpenTelemetry, so they go into the metrics and alerting tools you already run, like everything else. Workflow history can be exported for BI."
 
