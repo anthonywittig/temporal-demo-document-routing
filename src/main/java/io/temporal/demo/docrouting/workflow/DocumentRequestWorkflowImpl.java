@@ -26,12 +26,6 @@ import org.slf4j.Logger;
 public class DocumentRequestWorkflowImpl implements DocumentRequestWorkflow {
   private static final Logger log = Workflow.getLogger(DocumentRequestWorkflowImpl.class);
 
-  /**
-   * Every external call: give up on one attempt after 10s, retry transient failures with the
-   * default exponential backoff (1s, 2s, 4s ...) for as long as the outage lasts, and never retry
-   * a failure the activity marked non-retryable (a 4xx such as 422). The backoff is capped at 10s
-   * rather than the default 100s, so the Workflow picks up within seconds once a system is back.
-   */
   static final ActivityOptions ACTIVITY_OPTIONS =
       ActivityOptions.newBuilder()
           .setStartToCloseTimeout(Duration.ofSeconds(10))
