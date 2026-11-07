@@ -3,18 +3,21 @@ package io.temporal.demo.docrouting.workflow;
 import static org.junit.jupiter.api.Assertions.*;
 
 import io.temporal.api.enums.v1.IndexedValueType;
+import io.temporal.api.history.v1.HistoryEvent;
 import io.temporal.client.WorkflowClient;
 import io.temporal.client.WorkflowExecutionDescription;
 import io.temporal.client.WorkflowFailedException;
 import io.temporal.client.WorkflowOptions;
 import io.temporal.client.WorkflowStub;
 import io.temporal.client.WorkflowUpdateException;
+import io.temporal.common.converter.DefaultDataConverter;
 import io.temporal.demo.docrouting.workflow.SearchAttrs.Steps;
 import io.temporal.failure.ApplicationFailure;
 import io.temporal.testing.TestWorkflowEnvironment;
 import io.temporal.worker.Worker;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.List;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
@@ -116,6 +119,38 @@ class DocumentRequestWorkflowTest {
     assertEquals(Route.INVOICE, outcome.path());
     assertEquals(List.of("Classify", "EvaluateRules", "PostInvoiceToErp", "NotifyRequester"), fake.calls());
     assertEquals(Steps.COMPLETED, step(wf));
+  }
+
+  /** The Temporal UI timeline labels each bar with its summary, so every step reads as a phrase. */
+  @Test
+  void timelineShowsReadableNames() throws Exception {
+    start(true);
+    fake.route(Route.INVOICE, 1);
+    var wf = begin(doc("t1", "Services", "invoice", 3000));
+    awaitStep(wf, Steps.AWAIT_ERP_CONFIRMATION);
+    wf.erpPostingConfirmed(new ErpConfirmation("A-test", "now"));
+    result(wf);
+
+    var converter = DefaultDataConverter.newDefaultInstance();
+    List<String> activities = new ArrayList<>();
+    List<String> timers = new ArrayList<>();
+    List<String> signals = new ArrayList<>();
+    for (HistoryEvent e : client.fetchHistory(DocumentRequestWorkflow.workflowId("t1")).getEvents()) {
+      String summary = e.hasUserMetadata() && e.getUserMetadata().hasSummary()
+          ? converter.fromPayload(e.getUserMetadata().getSummary(), String.class, String.class)
+          : null;
+      switch (e.getEventType()) {
+        case EVENT_TYPE_ACTIVITY_TASK_SCHEDULED -> activities.add(summary);
+        case EVENT_TYPE_TIMER_STARTED -> timers.add(summary);
+        case EVENT_TYPE_WORKFLOW_EXECUTION_SIGNALED ->
+            signals.add(e.getWorkflowExecutionSignaledEventAttributes().getSignalName());
+        default -> {}
+      }
+    }
+    assertEquals(List.of("Classify", "Evaluate Rules", "Post Invoice to ERP", "Notify Requester",
+        "Archive Document"), activities);
+    assertEquals(List.of("Wait for ERP Confirmation"), timers);
+    assertEquals(List.of("ERP Posting Confirmed"), signals);
   }
 
   @Test
