@@ -65,7 +65,8 @@ public class DocumentRequestWorkflowImpl implements DocumentRequestWorkflow {
 
     step(Steps.CLASSIFY);
     String docType = activities.classify(doc);
-    // Set once a reviewer approves the cost; later evaluations skip the cost threshold.
+    // Set once a reviewer approves the cost. Later evaluations still apply the rules in force
+    // then; the approval only counts if those rules would still send the cost to a person.
     boolean costApproved = false;
 
     // At most two rounds: once the cost is approved the rules can't route back to HumanReview,
@@ -84,7 +85,8 @@ public class DocumentRequestWorkflowImpl implements DocumentRequestWorkflow {
         case HUMAN_REVIEW -> {
           ReviewDecision review = humanTask(doc, route, round);
           if (review.action() == ReviewAction.APPROVE) {
-            // Back through the rules in force now, without the cost check that sent it here.
+            // Back through the rules in force now. If they still need a review, this approval
+            // is it; if they no longer do, the request is routed by them alone.
             costApproved = true;
             continue;
           }
