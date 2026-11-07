@@ -103,6 +103,16 @@ class RulesLoaderTest {
   }
 
   @Test
+  void humanReviewDefaultIsRejected() throws IOException {
+    loader.current();
+    Files.writeString(file, V1.replace("\"version\": 1", "\"version\": 2")
+        .replace("\"default\": \"ErpPosting\" },", "\"default\": \"HumanReview\" },"));
+    assertEquals(1, loader.current().version());
+    assertTrue(loader.status().lastRejection().contains("Services.default must not be HumanReview"),
+        loader.status().lastRejection());
+  }
+
+  @Test
   void pathNamesRoundTrip() {
     for (var r : Route.values()) assertEquals(r, Route.fromValue(r.value()));
   }
