@@ -278,7 +278,7 @@ function renderViews() {
     ["SLA breached", "SlaBreached=true"],
     ["Failed at the cost-center check", 'ExecutionStatus="Failed" AND Step="CheckCostCenter"'],
     ["Waiting for the ERP to confirm", 'Step="AwaitErpConfirmation" AND ExecutionStatus="Running"'],
-    ["Rejected and compensated", 'Step="Rejected"'],
+    ["Rejected (by a reviewer or the supplier)", 'Step="Rejected"'],
     ["Nutrition", 'BusinessUnit="Nutrition"'],
     ["Devices", 'BusinessUnit="Devices"'],
     ["All document requests", 'WorkflowType="DocumentRequestWorkflow"'],

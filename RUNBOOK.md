@@ -113,8 +113,8 @@ Thirty-second version: "A document comes in, is classified, and business-unit ru
 ### 4. A person approves it; the SLA runs out
 
 1. In the inbox, on the Devices request from beat 3, type a comment and click **Approve**. A toast says "Approved by Sam Chen: recorded by Temporal".
-2. The request goes back through the rules, now **v2**, this time with the cost check waived. It goes down path B and completes. Open it in the Temporal UI: there are two `EvaluateRules` results, v1 → A ("cost 3000 is above the human-review threshold 1000") and then v2 → B ("cost 3000 approved by a reviewer"), with the Update `Review` between them carrying the reviewer and the comment.
-3. Say: "Approval is a loop in code, not a special feature. The request re-runs the rules in force now, minus the check the reviewer just signed off, so if the rules changed meanwhile, it follows the new ones. Whoever opens the history sees both decisions and who made the call in between."
+2. The request goes back through the rules in force now, **v2**, this time with the cost check waived, so it takes the Devices default path, B, and completes. Open it in the Temporal UI: there are two `EvaluateRules` results, v1 → A ("cost 3000 is above the human-review threshold 1000") and then v2 → B ("cost 3000 approved by a reviewer"), with the Update `Review` between them carrying the reviewer and the comment.
+3. Say: "Approval is a loop in code, not a special feature. The request re-runs the rules in force now, minus the check the reviewer just signed off: it arrived under v1, and its second decision was made by v2. Whoever opens the history sees both decisions, which rules made each one, and who made the call in between."
 4. Click **Nutrition · invoice · $12,000**. It lands in the inbox (above Nutrition's 5000 threshold). Click **Waiting on a person** under **Temporal UI views** to show the same list in the Temporal UI.
 5. Let the SLA run out while you talk (60 seconds by default). The row turns red with **SLA breached**. In the Temporal UI, **SLA breached** lists it, and the request's timeline shows the fired **Review SLA (1m)** timer.
 6. Say: "The SLA is a durable timer. Breaching it flags the request; it doesn't cancel it. A late decision still counts. In production the flag is what you alert on."
@@ -308,7 +308,7 @@ WorkerDeploymentOptions.newBuilder()
 
 ### What's demo-only
 
-- **v2 is a flag, not a new build.** [`WorkerMain.settingsFor`](src/main/java/io/temporal/demo/docrouting/worker/WorkerMain.java#L68-L71) turns on the archive step for any Build ID other than `v1`. In a real release, v2 would be new code built and deployed with its own Build ID.
+- **v2 is a flag, not a new build.** [`WorkerMain.settingsFor`](src/main/java/io/temporal/demo/docrouting/worker/WorkerMain.java#L69-L72) turns on the archive step for any Build ID other than `v1`. In a real release, v2 would be new code built and deployed with its own Build ID.
 - **The rules engine is a JSON file.** It stands in for Drools or a decision-table service. The workflow calls it through one Activity, so swapping it is local to [`RulesLoader`](src/main/java/io/temporal/demo/docrouting/rules/RulesLoader.java). Scheduled activation isn't built.
 - **The external systems are one mock process,** with an in-memory idempotency store that forgets everything on restart. Real systems keep idempotency keys durably.
 - **Every activity pauses 500ms before it runs** (`ACTIVITY_DELAY`), so the steps are spaced out in the Temporal UI timeline. Without it they finish within milliseconds of each other. Set `ACTIVITY_DELAY=0s` to turn it off.
