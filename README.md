@@ -2,7 +2,7 @@
 
 A document arrives, is classified, and business-unit rules route it down one of three paths:
 
-- **`HumanReview`.** A reviewer rejects the request, which ends it, or approves its cost, which sends it back through the rules with the cost threshold waived, so it continues down `Invoice` or `PurchaseOrder`.
+- **`HumanReview`.** A reviewer rejects the request, which ends it, or approves its cost, which sends it back through the rules in force now, so it continues down `Invoice` or `PurchaseOrder`. The approval only counts if those rules still put the cost above the threshold; if a rule change has since brought the cost within it, the request is routed by the new rules alone.
 - **`Invoice`.** The invoice is posted to the ERP, which confirms the posting asynchronously, and the requester is notified.
 - **`PurchaseOrder`.** The purchase order's cost center is checked synchronously, budget is reserved, and the PO is sent to the supplier portal. If the supplier rejects it, the budget reservation is released.
 

@@ -18,7 +18,8 @@ public interface DocumentActivities {
   /**
    * Reads the current routing rules; the decision, with its rules version, lands in history.
    *
-   * @param costApproved a reviewer has approved the cost, so the human-review threshold is skipped
+   * @param costApproved a reviewer has approved the cost; used only if the current rules still put
+   *     the cost above the human-review threshold
    */
   RoutingDecision evaluateRules(DocumentRequest doc, String docType, boolean costApproved);
 

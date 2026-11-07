@@ -65,12 +65,34 @@ class RulesLoaderTest {
   }
 
   @Test
-  void approvedCostSkipsTheHumanReviewThreshold() {
+  void approvalStandsInForTheReviewTheCurrentRulesNeed() {
     var approvedInvoice = loader.evaluate("Services", "invoice", 12000, true);
     assertEquals(Route.INVOICE, approvedInvoice.path());
-    assertTrue(approvedInvoice.reason().contains("approved by a reviewer"), approvedInvoice.reason());
+    assertEquals(
+        "Services: invoice documents are posted to the ERP (cost 12000 is above 5000, approved by a reviewer)",
+        approvedInvoice.reason());
     assertEquals(Route.PURCHASE_ORDER, loader.evaluate("Equipment", "purchase-order", 12000, true).path());
     assertEquals(Route.HUMAN_REVIEW, loader.evaluate("Services", "invoice", 12000, false).path());
+  }
+
+  @Test
+  void approvalIsIgnoredWhenTheCurrentRulesNoLongerNeedAReview() throws IOException {
+    // Approved under v1 (Equipment threshold 1000); v2 raises the threshold above the cost.
+    Files.writeString(file, V1.replace("\"version\": 1", "\"version\": 2").replace("1000", "5000"));
+    var decision = loader.evaluate("Equipment", "invoice", 3000, true);
+    assertEquals(Route.INVOICE, decision.path());
+    assertEquals(2, decision.rulesVersion());
+    assertEquals("Equipment: invoice documents are posted to the ERP (cost 3000 is within 5000)", decision.reason());
+  }
+
+  @Test
+  void approvalStillCountsWhenTheCurrentRulesStillNeedAReview() throws IOException {
+    // Approved under v1 (Equipment threshold 1000); v2 changes the threshold but not the answer.
+    Files.writeString(file, V1.replace("\"version\": 1", "\"version\": 2").replace("1000", "2000"));
+    var decision = loader.evaluate("Equipment", "invoice", 3000, true);
+    assertEquals(Route.INVOICE, decision.path());
+    assertEquals(2, decision.rulesVersion());
+    assertTrue(decision.reason().contains("above 2000, approved by a reviewer"), decision.reason());
   }
 
   @Test
