@@ -18,8 +18,8 @@ class RulesLoaderTest {
   static final String V1 = """
       { "version": 1,
         "businessUnits": {
-          "Nutrition": { "humanReviewAbove": 5000, "externalChecksFor": ["purchase-order"], "default": "ErpPosting" },
-          "Devices": { "humanReviewAbove": 1000, "externalChecksFor": ["purchase-order", "contract"], "default": "ErpPosting" } } }
+          "Services": { "humanReviewAbove": 5000, "externalChecksFor": ["purchase-order"], "default": "ErpPosting" },
+          "Equipment": { "humanReviewAbove": 1000, "externalChecksFor": ["purchase-order", "contract"], "default": "ErpPosting" } } }
       """;
 
   @BeforeEach
@@ -37,28 +37,28 @@ class RulesLoaderTest {
 
   @Test
   void sameCostRoutesDifferentlyPerBusinessUnit() {
-    var nutrition = loader.evaluate("Nutrition", "invoice", 3000);
-    var devices = loader.evaluate("Devices", "invoice", 3000);
-    assertEquals(Route.ERP_POSTING, nutrition.path());
-    assertEquals(Route.HUMAN_REVIEW, devices.path());
-    assertEquals(1, nutrition.rulesVersion());
-    assertTrue(devices.reason().contains("1000"), devices.reason());
+    var services = loader.evaluate("Services", "invoice", 3000);
+    var equipment = loader.evaluate("Equipment", "invoice", 3000);
+    assertEquals(Route.ERP_POSTING, services.path());
+    assertEquals(Route.HUMAN_REVIEW, equipment.path());
+    assertEquals(1, services.rulesVersion());
+    assertTrue(equipment.reason().contains("1000"), equipment.reason());
   }
 
   @Test
   void eachPath() {
-    assertEquals(Route.HUMAN_REVIEW, loader.evaluate("Nutrition", "invoice", 12000).path());
-    assertEquals(Route.ERP_POSTING, loader.evaluate("Nutrition", "invoice", 300).path());
-    assertEquals(Route.EXTERNAL_CHECKS, loader.evaluate("Devices", "purchase-order", 800).path());
+    assertEquals(Route.HUMAN_REVIEW, loader.evaluate("Services", "invoice", 12000).path());
+    assertEquals(Route.ERP_POSTING, loader.evaluate("Services", "invoice", 300).path());
+    assertEquals(Route.EXTERNAL_CHECKS, loader.evaluate("Equipment", "purchase-order", 800).path());
   }
 
   @Test
   void approvedCostSkipsTheHumanReviewThreshold() {
-    var approvedInvoice = loader.evaluate("Nutrition", "invoice", 12000, true);
+    var approvedInvoice = loader.evaluate("Services", "invoice", 12000, true);
     assertEquals(Route.ERP_POSTING, approvedInvoice.path());
     assertTrue(approvedInvoice.reason().contains("approved by a reviewer"), approvedInvoice.reason());
-    assertEquals(Route.EXTERNAL_CHECKS, loader.evaluate("Devices", "purchase-order", 12000, true).path());
-    assertEquals(Route.HUMAN_REVIEW, loader.evaluate("Nutrition", "invoice", 12000, false).path());
+    assertEquals(Route.EXTERNAL_CHECKS, loader.evaluate("Equipment", "purchase-order", 12000, true).path());
+    assertEquals(Route.HUMAN_REVIEW, loader.evaluate("Services", "invoice", 12000, false).path());
   }
 
   @Test
@@ -69,9 +69,9 @@ class RulesLoaderTest {
 
   @Test
   void liveEditTakesEffectOnNextEvaluation() throws IOException {
-    assertEquals(Route.ERP_POSTING, loader.evaluate("Nutrition", "invoice", 3000).path());
+    assertEquals(Route.ERP_POSTING, loader.evaluate("Services", "invoice", 3000).path());
     Files.writeString(file, V1.replace("\"version\": 1", "\"version\": 2").replace("5000", "2000"));
-    var decision = loader.evaluate("Nutrition", "invoice", 3000);
+    var decision = loader.evaluate("Services", "invoice", 3000);
     assertEquals(Route.HUMAN_REVIEW, decision.path());
     assertEquals(2, decision.rulesVersion());
   }
@@ -90,7 +90,7 @@ class RulesLoaderTest {
     loader.current();
     Files.writeString(file, V1.replace("\"version\": 1", "\"version\": 2").replace("5000", "-5"));
     assertEquals(1, loader.current().version());
-    assertTrue(loader.status().lastRejection().contains("Nutrition.humanReviewAbove"));
+    assertTrue(loader.status().lastRejection().contains("Services.humanReviewAbove"));
   }
 
   @Test
@@ -105,7 +105,7 @@ class RulesLoaderTest {
   @Test
   void olderRulesFilesWithPathLettersStillLoad() throws IOException {
     Files.writeString(file, V1.replace("\"ErpPosting\"", "\"B\""));
-    assertEquals(Route.ERP_POSTING, loader.current().businessUnits().get("Nutrition").defaultPath());
+    assertEquals(Route.ERP_POSTING, loader.current().businessUnits().get("Services").defaultPath());
     assertNull(loader.status().lastRejection());
     for (var r : Route.values()) assertEquals(r, Route.fromValue(r.value()));
     assertEquals(Route.HUMAN_REVIEW, Route.fromValue("A"));
@@ -117,7 +117,7 @@ class RulesLoaderTest {
     Files.writeString(file, V1.replace("\"version\": 1", "\"version\": 2").replace("5000", "2000"));
     assertEquals(2, loader.current().version());
     Files.writeString(file, V1);
-    var decision = loader.evaluate("Nutrition", "invoice", 3000);
+    var decision = loader.evaluate("Services", "invoice", 3000);
     assertEquals(1, decision.rulesVersion());
     assertEquals(Route.ERP_POSTING, decision.path());
   }

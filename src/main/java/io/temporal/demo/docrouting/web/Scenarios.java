@@ -18,11 +18,11 @@ public final class Scenarios {
   public static final String DUPLICATE = "duplicate";
 
   public static final List<Scenario> ALL = List.of(
-      new Scenario("nutrition-invoice-3000", "Nutrition · invoice · $3,000", "Posted to the ERP", "Nutrition", "invoice", 3000, "CC-10", 1),
-      new Scenario("devices-invoice-3000", "Devices · invoice · $3,000", "Same cost, Devices: human task", "Devices", "invoice", 3000, "CC-20", 1),
-      new Scenario("nutrition-invoice-12000", "Nutrition · invoice · $12,000", "Above Nutrition's threshold: human task", "Nutrition", "invoice", 12000, "CC-10", 1),
-      new Scenario("devices-po-800", "Devices · purchase order · $800", "External checks: cost center, then the supplier", "Devices", "purchase-order", 800, "CC-30", 1),
-      new Scenario("cc99-batch", "3 × cost center CC-99", "External checks: an unknown cost center", "Devices", "purchase-order", 800, "CC-99", 3));
+      new Scenario("services-invoice-3000", "Services · invoice · $3,000", "Posted to the ERP", "Services", "invoice", 3000, "CC-10", 1),
+      new Scenario("equipment-invoice-3000", "Equipment · invoice · $3,000", "Same cost, Equipment: human task", "Equipment", "invoice", 3000, "CC-20", 1),
+      new Scenario("services-invoice-12000", "Services · invoice · $12,000", "Above the Services threshold: human task", "Services", "invoice", 12000, "CC-10", 1),
+      new Scenario("equipment-po-800", "Equipment · purchase order · $800", "External checks: cost center, then the supplier", "Equipment", "purchase-order", 800, "CC-30", 1),
+      new Scenario("cc99-batch", "3 × cost center CC-99", "External checks: an unknown cost center", "Equipment", "purchase-order", 800, "CC-99", 3));
 
   public static Scenario find(String id) {
     return ALL.stream().filter(s -> s.id().equals(id)).findFirst().orElse(null);

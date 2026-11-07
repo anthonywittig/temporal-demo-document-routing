@@ -278,9 +278,9 @@ function renderViews() {
     ["SLA breached", "SlaBreached=true"],
     ["Failed at the cost-center check", 'ExecutionStatus="Failed" AND Step="CheckCostCenter"'],
     ["Waiting for the ERP to confirm", 'Step="AwaitErpConfirmation" AND ExecutionStatus="Running"'],
-    ["Rejected and compensated", 'Step="Rejected"'],
-    ["Nutrition", 'BusinessUnit="Nutrition"'],
-    ["Devices", 'BusinessUnit="Devices"'],
+    ["Rejected (by a reviewer or the supplier)", 'Step="Rejected"'],
+    ["Services", 'BusinessUnit="Services"'],
+    ["Equipment", 'BusinessUnit="Equipment"'],
     ["All document requests", 'WorkflowType="DocumentRequestWorkflow"'],
   ];
   $("views").replaceChildren(...views.map(([label, q]) =>

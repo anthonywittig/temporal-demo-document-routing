@@ -90,11 +90,11 @@ class DocumentRequestWorkflowTest {
   void decisionAndProgressAreSearchable() throws Exception {
     start(false);
     fake.route(Route.HUMAN_REVIEW, 7);
-    var wf = begin(doc("sa1", "Devices", "invoice", 3000));
+    var wf = begin(doc("sa1", "Equipment", "invoice", 3000));
     awaitStep(wf, Steps.HUMAN_TASK);
     var attrs = describe(wf).getTypedSearchAttributes();
     assertEquals("HumanReview", attrs.get(SearchAttrs.PATH));
-    assertEquals("Devices", attrs.get(SearchAttrs.BUSINESS_UNIT));
+    assertEquals("Equipment", attrs.get(SearchAttrs.BUSINESS_UNIT));
     assertEquals(7L, attrs.get(SearchAttrs.RULES_VERSION));
     assertEquals(false, attrs.get(SearchAttrs.SLA_BREACHED));
     assertEquals("sa1-r1", describe(wf).getMemo("taskId", String.class));
@@ -107,7 +107,7 @@ class DocumentRequestWorkflowTest {
   void pathBWaitsForErpConfirmationThenNotifies() throws Exception {
     start(false);
     fake.route(Route.ERP_POSTING, 1);
-    var wf = begin(doc("b1", "Nutrition", "invoice", 3000));
+    var wf = begin(doc("b1", "Services", "invoice", 3000));
     awaitStep(wf, Steps.AWAIT_ERP_CONFIRMATION);
     assertFalse(fake.calls().contains("NotifyRequester"), "must not notify before the acknowledgement");
     wf.erpPostingConfirmed(new ErpConfirmation("A-test", "now"));
@@ -122,7 +122,7 @@ class DocumentRequestWorkflowTest {
   void acknowledgementArrivingEarlyIsKept() {
     start(false);
     fake.route(Route.ERP_POSTING, 1);
-    var wf = begin(doc("b2", "Nutrition", "invoice", 3000));
+    var wf = begin(doc("b2", "Services", "invoice", 3000));
     wf.erpPostingConfirmed(new ErpConfirmation("A-test", "now"));
     wf.erpPostingConfirmed(new ErpConfirmation("A-dup", "later")); // duplicate is ignored
     assertEquals(RequestOutcome.COMPLETED, result(wf).status());
@@ -133,7 +133,7 @@ class DocumentRequestWorkflowTest {
   void missingErpConfirmationFailsTheStep() {
     start(false);
     fake.route(Route.ERP_POSTING, 1);
-    var wf = begin(doc("b3", "Nutrition", "invoice", 3000));
+    var wf = begin(doc("b3", "Services", "invoice", 3000));
     var e = assertThrows(WorkflowFailedException.class, () -> result(wf));
     assertEquals("CallbackTimeout", ((ApplicationFailure) e.getCause()).getType());
     assertEquals(Steps.AWAIT_ERP_CONFIRMATION, step(wf));
@@ -145,7 +145,7 @@ class DocumentRequestWorkflowTest {
   void reviewerRejectsTheRequest() throws Exception {
     start(true); // even on v2, a rejection is not archived
     fake.route(Route.HUMAN_REVIEW, 1);
-    var wf = begin(doc("a1", "Devices", "invoice", 3000));
+    var wf = begin(doc("a1", "Equipment", "invoice", 3000));
     awaitStep(wf, Steps.HUMAN_TASK);
     ReviewResult r = wf.review(new ReviewDecision("a1-r1", ReviewAction.REJECT, "Sam", "not in budget"));
     assertEquals("a1-r1", r.taskId());
@@ -162,7 +162,7 @@ class DocumentRequestWorkflowTest {
   void approveReEvaluatesUnderCurrentRulesWithoutTheCostCheck() throws Exception {
     start(false);
     fake.route(Route.HUMAN_REVIEW, 1).route(Route.ERP_POSTING, 2); // the rules change while the task is open
-    var wf = begin(doc("a2", "Devices", "invoice", 3000));
+    var wf = begin(doc("a2", "Equipment", "invoice", 3000));
     awaitStep(wf, Steps.HUMAN_TASK);
     ReviewResult r = wf.review(new ReviewDecision("a2-r1", ReviewAction.APPROVE, "Sam", "worth it"));
     assertEquals("Approved by Sam", r.message());
@@ -179,7 +179,7 @@ class DocumentRequestWorkflowTest {
   void approvalCanStillEndInPathC() throws Exception {
     start(false);
     fake.route(Route.HUMAN_REVIEW, 1).route(Route.EXTERNAL_CHECKS, 1);
-    var wf = begin(doc("a5", "Devices", "purchase-order", 3000));
+    var wf = begin(doc("a5", "Equipment", "purchase-order", 3000));
     awaitStep(wf, Steps.HUMAN_TASK);
     wf.review(new ReviewDecision("a5-r1", ReviewAction.APPROVE, "Sam", ""));
     RequestOutcome outcome = result(wf);
@@ -193,7 +193,7 @@ class DocumentRequestWorkflowTest {
   void staleOrWrongTaskIsRejectedWithoutTouchingHistory() throws Exception {
     start(false);
     fake.route(Route.HUMAN_REVIEW, 1).route(Route.HUMAN_REVIEW, 1);
-    var wf = begin(doc("a3", "Devices", "invoice", 3000));
+    var wf = begin(doc("a3", "Equipment", "invoice", 3000));
     awaitStep(wf, Steps.HUMAN_TASK);
 
     var wrong = assertThrows(WorkflowUpdateException.class,
@@ -216,7 +216,7 @@ class DocumentRequestWorkflowTest {
   void slaBreachMarksTheTaskButKeepsItOpen() throws Exception {
     start(false);
     fake.route(Route.HUMAN_REVIEW, 1);
-    var wf = begin(doc("a4", "Devices", "invoice", 3000));
+    var wf = begin(doc("a4", "Equipment", "invoice", 3000));
     awaitStep(wf, Steps.HUMAN_TASK);
     env.sleep(SLA.plusSeconds(5));
     assertEquals(true, describe(wf).getTypedSearchAttributes().get(SearchAttrs.SLA_BREACHED));
@@ -231,7 +231,7 @@ class DocumentRequestWorkflowTest {
   void pathCRunsChecksTasksAndFinalAction() throws Exception {
     start(false);
     fake.route(Route.EXTERNAL_CHECKS, 1);
-    var wf = begin(doc("c1", "Devices", "purchase-order", 800));
+    var wf = begin(doc("c1", "Equipment", "purchase-order", 800));
     assertEquals(RequestOutcome.COMPLETED, result(wf).status());
     assertEquals(List.of("Classify", "EvaluateRules", "CheckCostCenter",
         "ReserveBudget", "SendPurchaseOrder", "NotifyRequester"), fake.calls());
@@ -242,7 +242,7 @@ class DocumentRequestWorkflowTest {
     start(false);
     fake.route(Route.EXTERNAL_CHECKS, 1);
     fake.supplierRejects = true;
-    var wf = begin(doc("c2", "Devices", "purchase-order", 800));
+    var wf = begin(doc("c2", "Equipment", "purchase-order", 800));
     RequestOutcome outcome = result(wf);
     assertEquals(RequestOutcome.REJECTED, outcome.status());
     List<String> tail = fake.calls().subList(fake.calls().size() - 3, fake.calls().size());
@@ -255,7 +255,7 @@ class DocumentRequestWorkflowTest {
     start(false);
     fake.route(Route.EXTERNAL_CHECKS, 1);
     fake.costCenterUnknown = true;
-    var wf = begin(doc("c3", "Devices", "purchase-order", 800));
+    var wf = begin(doc("c3", "Equipment", "purchase-order", 800));
     var e = assertThrows(WorkflowFailedException.class, () -> result(wf));
     assertTrue(e.getCause().getCause().getMessage().contains("unknown cost center"), e.getCause().getCause().getMessage());
     assertEquals(Steps.CHECK_COST_CENTER, step(wf));
@@ -268,7 +268,7 @@ class DocumentRequestWorkflowTest {
   void v1HasNoArchiveStep() {
     start(false);
     fake.route(Route.ERP_POSTING, 1);
-    var wf = begin(doc("v1", "Nutrition", "invoice", 3000));
+    var wf = begin(doc("v1", "Services", "invoice", 3000));
     wf.erpPostingConfirmed(new ErpConfirmation("A-test", "now"));
     result(wf);
     assertFalse(fake.calls().contains("ArchiveDocument"));
@@ -278,7 +278,7 @@ class DocumentRequestWorkflowTest {
   void v2ArchivesEveryCompletedRequest() {
     start(true);
     fake.route(Route.ERP_POSTING, 1);
-    var wf = begin(doc("v2", "Nutrition", "invoice", 3000));
+    var wf = begin(doc("v2", "Services", "invoice", 3000));
     wf.erpPostingConfirmed(new ErpConfirmation("A-test", "now"));
     result(wf);
     assertEquals("ArchiveDocument", fake.calls().get(fake.calls().size() - 1));
