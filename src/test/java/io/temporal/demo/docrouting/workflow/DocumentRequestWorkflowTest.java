@@ -142,31 +142,51 @@ class DocumentRequestWorkflowTest {
   // ---- path A ----------------------------------------------------------------------------------
 
   @Test
-  void reviewerCompletesTheTask() throws Exception {
-    start(false);
+  void reviewerRejectsTheRequest() throws Exception {
+    start(true); // even on v2, a rejection is not archived
     fake.route(Route.A, 1);
     var wf = begin(doc("a1", "BU2", "invoice", 3000));
     awaitStep(wf, Steps.HUMAN_TASK);
-    ReviewResult r = wf.review(new ReviewDecision("a1-r1", ReviewAction.COMPLETE, "Sam", "looks right"));
+    ReviewResult r = wf.review(new ReviewDecision("a1-r1", ReviewAction.REJECT, "Sam", "not in budget"));
     assertEquals("a1-r1", r.taskId());
+    assertEquals("Rejected by Sam", r.message());
     RequestOutcome outcome = result(wf);
-    assertEquals(RequestOutcome.COMPLETED, outcome.status());
+    assertEquals(RequestOutcome.REJECTED, outcome.status());
+    assertEquals(Route.A, outcome.path());
     assertTrue(outcome.detail().contains("Sam"));
+    assertEquals(List.of("Classify", "EvaluateRules", "NotifyRequester"), fake.calls());
+    assertEquals(Steps.REJECTED, step(wf));
   }
 
   @Test
-  void sendBackReEvaluatesUnderCurrentRules() throws Exception {
+  void approveReEvaluatesUnderCurrentRulesWithoutTheCostCheck() throws Exception {
     start(false);
     fake.route(Route.A, 1).route(Route.B, 2); // the rules change while the task is open
     var wf = begin(doc("a2", "BU2", "invoice", 3000));
     awaitStep(wf, Steps.HUMAN_TASK);
-    wf.review(new ReviewDecision("a2-r1", ReviewAction.SEND_BACK, "Sam", "threshold changed"));
+    ReviewResult r = wf.review(new ReviewDecision("a2-r1", ReviewAction.APPROVE, "Sam", "worth it"));
+    assertEquals("Approved by Sam", r.message());
     awaitStep(wf, Steps.AWAIT_ERP_CONFIRMATION);
     wf.erpPostingConfirmed(new ErpConfirmation("A-test", "now"));
     RequestOutcome outcome = result(wf);
+    assertEquals(RequestOutcome.COMPLETED, outcome.status());
     assertEquals(Route.B, outcome.path());
     assertEquals(2, outcome.rulesVersion());
-    assertEquals(2, fake.calls().stream().filter("EvaluateRules"::equals).count());
+    assertEquals(List.of(false, true), fake.costApprovedFlags, "the second evaluation must skip the cost check");
+  }
+
+  @Test
+  void approvalCanStillEndInPathC() throws Exception {
+    start(false);
+    fake.route(Route.A, 1).route(Route.C, 1);
+    var wf = begin(doc("a5", "BU2", "purchase-order", 3000));
+    awaitStep(wf, Steps.HUMAN_TASK);
+    wf.review(new ReviewDecision("a5-r1", ReviewAction.APPROVE, "Sam", ""));
+    RequestOutcome outcome = result(wf);
+    assertEquals(RequestOutcome.COMPLETED, outcome.status());
+    assertEquals(Route.C, outcome.path());
+    assertEquals(List.of("Classify", "EvaluateRules", "EvaluateRules", "CheckCostCenter",
+        "ReserveBudget", "SendPurchaseOrder", "NotifyRequester"), fake.calls());
   }
 
   @Test
@@ -177,14 +197,14 @@ class DocumentRequestWorkflowTest {
     awaitStep(wf, Steps.HUMAN_TASK);
 
     var wrong = assertThrows(WorkflowUpdateException.class,
-        () -> wf.review(new ReviewDecision("nope", ReviewAction.COMPLETE, "Sam", "")));
+        () -> wf.review(new ReviewDecision("nope", ReviewAction.REJECT, "Sam", "")));
     assertTrue(wrong.getCause().getMessage().contains("no longer open"), wrong.getCause().getMessage());
 
-    wf.review(new ReviewDecision("a3-r1", ReviewAction.SEND_BACK, "Sam", ""));
-    awaitStep(wf, Steps.HUMAN_TASK);
-    // A second click on the first task, after it was sent back, is stale.
+    wf.review(new ReviewDecision("a3-r1", ReviewAction.APPROVE, "Sam", ""));
+    awaitStep(wf, Steps.HUMAN_TASK); // the scripted rules route it to a person again
+    // A second click on the first task, after it was approved, is stale.
     var stale = assertThrows(WorkflowUpdateException.class,
-        () -> wf.review(new ReviewDecision("a3-r1", ReviewAction.COMPLETE, "Sam", "")));
+        () -> wf.review(new ReviewDecision("a3-r1", ReviewAction.REJECT, "Sam", "")));
     assertTrue(stale.getCause().getMessage().contains("a3-r2"), stale.getCause().getMessage());
 
     long updatesInHistory = client.fetchHistory(DocumentRequestWorkflow.workflowId("a3")).getEvents().stream()
@@ -201,8 +221,8 @@ class DocumentRequestWorkflowTest {
     env.sleep(SLA.plusSeconds(5));
     assertEquals(true, describe(wf).getTypedSearchAttributes().get(SearchAttrs.SLA_BREACHED));
     assertEquals(Steps.HUMAN_TASK, step(wf));
-    wf.review(new ReviewDecision("a4-r1", ReviewAction.COMPLETE, "Sam", "late but fine"));
-    assertEquals(RequestOutcome.COMPLETED, result(wf).status());
+    wf.review(new ReviewDecision("a4-r1", ReviewAction.REJECT, "Sam", "late, and no"));
+    assertEquals(RequestOutcome.REJECTED, result(wf).status());
   }
 
   // ---- path C ----------------------------------------------------------------------------------

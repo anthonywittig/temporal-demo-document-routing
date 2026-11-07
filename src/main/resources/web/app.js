@@ -130,10 +130,10 @@ function renderInbox(inbox) {
   }
   body.replaceChildren(...inbox.map((t) => {
     const comment = el("input", { class: "comment", placeholder: "comment (optional)" });
-    const complete = el("button", { class: "button small" }, "Complete");
-    const sendBack = el("button", { class: "button small ghost" }, "Send back");
-    complete.addEventListener("click", () => review(t, "COMPLETE", comment, [complete, sendBack]));
-    sendBack.addEventListener("click", () => review(t, "SEND_BACK", comment, [complete, sendBack]));
+    const approve = el("button", { class: "button small", title: "Approve the cost and route it on through the rules" }, "Approve");
+    const reject = el("button", { class: "button small ghost", title: "Reject the request and close it" }, "Reject");
+    approve.addEventListener("click", () => review(t, "APPROVE", comment, [approve, reject]));
+    reject.addEventListener("click", () => review(t, "REJECT", comment, [approve, reject]));
     return el("tr", { class: t.slaBreached ? "breached" : "" },
       el("td", {}, el("a", { href: uiWorkflowUrl(t.workflowId, t.runId), target: "_blank", rel: "noopener" }, t.documentId),
         el("div", { class: "muted small" }, t.routingReason || "")),
@@ -141,7 +141,7 @@ function renderInbox(inbox) {
       el("td", {}, money(t.cost)),
       el("td", {}, t.rulesVersion ? `v${t.rulesVersion}` : ""),
       el("td", { "data-sla": t.taskId }, slaCell(t)),
-      el("td", { class: "actions" }, comment, complete, sendBack));
+      el("td", { class: "actions" }, comment, approve, reject));
   }));
 }
 

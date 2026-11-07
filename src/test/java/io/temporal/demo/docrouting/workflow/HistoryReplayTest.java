@@ -79,7 +79,7 @@ class HistoryReplayTest {
     Files.createDirectories(FIXTURES);
     record("v1-path-a.json", Route.A, false, (wf, client) -> {
       awaitStep(wf, Steps.HUMAN_TASK);
-      wf.review(new ReviewDecision("rec-a-r1", ReviewAction.COMPLETE, "Sam", "recorded"));
+      wf.review(new ReviewDecision("rec-a-r1", ReviewAction.REJECT, "Sam", "recorded"));
     });
     record("v1-path-b.json", Route.B, false, (wf, client) -> {
       awaitStep(wf, Steps.AWAIT_ERP_CONFIRMATION);

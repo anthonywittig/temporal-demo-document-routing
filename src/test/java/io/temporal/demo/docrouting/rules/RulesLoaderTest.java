@@ -53,6 +53,15 @@ class RulesLoaderTest {
   }
 
   @Test
+  void approvedCostSkipsTheHumanReviewThreshold() {
+    var approvedInvoice = loader.evaluate("BU1", "invoice", 12000, true);
+    assertEquals(Route.B, approvedInvoice.path());
+    assertTrue(approvedInvoice.reason().contains("approved by a reviewer"), approvedInvoice.reason());
+    assertEquals(Route.C, loader.evaluate("BU2", "purchase-order", 12000, true).path());
+    assertEquals(Route.A, loader.evaluate("BU1", "invoice", 12000, false).path());
+  }
+
+  @Test
   void unknownBusinessUnitIsRejected() {
     var e = assertThrows(RulesLoader.UnknownBusinessUnitException.class, () -> loader.evaluate("BU9", "invoice", 1));
     assertTrue(e.getMessage().contains("BU9"));
