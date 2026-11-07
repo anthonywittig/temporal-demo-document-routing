@@ -113,7 +113,7 @@ Thirty-second version: "A document comes in, is classified, and business-unit ru
 ### 4. A person approves it; the SLA runs out
 
 1. In the inbox, on the Equipment request from beat 3, type a comment and click **Approve**. A toast says "Approved by Sam Chen: recorded by Temporal".
-2. The request goes back through the rules in force now, **v2**, this time with the cost check waived, so it takes the Equipment default path, `ErpPosting`, and completes. Open it in the Temporal UI: there are two `EvaluateRules` results, v1 → `HumanReview` ("cost 3000 is above the human-review threshold 1000") and then v2 → `ErpPosting` ("cost 3000 approved by a reviewer"), with the Update `Review` between them carrying the reviewer and the comment.
+2. The request goes back through the rules in force now, **v2**, this time with the cost check waived, so the invoice goes to `ErpPosting` and completes. Open it in the Temporal UI: there are two `EvaluateRules` results, v1 → `HumanReview` ("cost 3000 is above the human-review threshold 1000") and then v2 → `ErpPosting` ("cost 3000 approved by a reviewer"), with the Update `Review` between them carrying the reviewer and the comment.
 3. Say: "Approval is a loop in code, not a special feature. The request re-runs the rules in force now, minus the check the reviewer just signed off: it arrived under v1, and its second decision was made by v2. Whoever opens the history sees both decisions, which rules made each one, and who made the call in between."
 4. Click **Services · invoice · $12,000**. It lands in the inbox (above the Services threshold of 5000). Click **Waiting on a person** under **Temporal UI views** to show the same list in the Temporal UI.
 5. Let the SLA run out while you talk (60 seconds by default). The row turns red with **SLA breached**. In the Temporal UI, **SLA breached** lists it, and the request's timeline shows the fired **Review SLA (1m)** timer.
@@ -221,7 +221,7 @@ Workflow.upsertTypedSearchAttributes(
     PATH.valueSet(route.path().value()), RULES_VERSION.valueSet((long) route.rulesVersion()));
 ```
 
-The rules file is read on every evaluation and validated, and the last good version is kept: [`RulesLoader.java` lines 55–76 and 90–123](src/main/java/io/temporal/demo/docrouting/rules/RulesLoader.java#L55-L123). Swap this class for a Drools or decision-table call and nothing else changes.
+The rules file is read on every evaluation and validated, and the last good version is kept: [`RulesLoader.java` lines 61–82 and 93–132](src/main/java/io/temporal/demo/docrouting/rules/RulesLoader.java#L61-L132). Swap this class for a Drools or decision-table call and nothing else changes.
 
 ### A human task: an Update with a validator
 

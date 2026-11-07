@@ -43,10 +43,9 @@ public final class RulesEditor {
     Rules current = loader.current();
     Map<String, UnitRules> units = new LinkedHashMap<>(current.businessUnits());
     thresholds.forEach((unit, threshold) -> {
-      UnitRules existing = units.get(unit);
-      if (existing == null) throw new InvalidEditException("Unknown business unit " + unit);
+      if (!units.containsKey(unit)) throw new InvalidEditException("Unknown business unit " + unit);
       if (threshold == null) throw new InvalidEditException(unit + " needs a threshold");
-      units.put(unit, new UnitRules(threshold, existing.purchaseOrderFor(), existing.defaultPath()));
+      units.put(unit, new UnitRules(threshold));
     });
     Rules next = new Rules(current.version() + 1, units);
     List<String> problems = RulesLoader.validate(next);

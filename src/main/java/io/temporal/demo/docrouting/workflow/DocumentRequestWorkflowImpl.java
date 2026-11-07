@@ -69,7 +69,7 @@ public class DocumentRequestWorkflowImpl implements DocumentRequestWorkflow {
     boolean costApproved = false;
 
     // At most two rounds: once the cost is approved the rules can't route back to HumanReview,
-    // because a unit's default path may not be HumanReview (RulesLoader.validate). The round
+    // because only the cost threshold leads there (RulesLoader.pathFor never picks it). The round
     // number keeps each review task's ID unique, so a stale decision can't approve a later task.
     for (int round = 1; ; round++) {
       step(Steps.EVALUATE_RULES);
