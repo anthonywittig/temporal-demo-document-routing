@@ -1,6 +1,5 @@
 package io.temporal.demo.docrouting.rules;
 
-import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.temporal.demo.docrouting.workflow.Route;
@@ -27,11 +26,9 @@ public final class RulesLoader {
       new ObjectMapper().enable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES);
 
   /**
-   * A unit's rules: the cost above which a person must approve. Older rules files also mapped
-   * document types to paths per unit; those fields still load but are ignored, since the path now
-   * follows from the document type alone ({@link #pathFor}).
+   * A unit's rules: the cost above which a person must approve. The path follows from the
+   * document type alone ({@link #pathFor}).
    */
-  @JsonIgnoreProperties({"purchaseOrderFor", "externalChecksFor", "default"})
   public record UnitRules(long humanReviewAbove) {}
 
   public record Rules(int version, Map<String, UnitRules> businessUnits) {}

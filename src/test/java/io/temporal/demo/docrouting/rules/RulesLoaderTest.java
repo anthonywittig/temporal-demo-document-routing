@@ -115,27 +115,9 @@ class RulesLoaderTest {
   }
 
   @Test
-  void pathNamesAndTheirOlderNamesParse() {
+  void pathNamesRoundTrip() {
     for (var r : Route.values()) assertEquals(r, Route.fromValue(r.value()));
-    assertEquals(Route.HUMAN_REVIEW, Route.fromValue("A"));
-    assertEquals(Route.INVOICE, Route.fromValue("B"));
-    assertEquals(Route.INVOICE, Route.fromValue("ErpPosting"));
-    assertEquals(Route.PURCHASE_ORDER, Route.fromValue("C"));
-    assertEquals(Route.PURCHASE_ORDER, Route.fromValue("ExternalChecks"));
-  }
-
-  /** Rules files from before thresholds were all they held: the path mappings load, and are ignored. */
-  @Test
-  void olderRulesFilesWithPathMappingsStillLoad() throws IOException {
-    Files.writeString(file, """
-        { "version": 1,
-          "businessUnits": {
-            "Services": { "humanReviewAbove": 5000, "purchaseOrderFor": ["purchase-order"], "default": "ErpPosting" },
-            "Equipment": { "humanReviewAbove": 1000, "externalChecksFor": ["purchase-order", "contract"], "default": "C" } } }
-        """);
-    assertEquals(1000, loader.current().businessUnits().get("Equipment").humanReviewAbove());
-    assertNull(loader.status().lastRejection());
-    assertEquals(Route.PURCHASE_ORDER, loader.evaluate("Services", "purchase-order", 500).path());
+    assertNull(Route.fromValue("ErpPosting"));
   }
 
   @Test
