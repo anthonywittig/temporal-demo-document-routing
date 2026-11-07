@@ -68,7 +68,7 @@ public class DocumentRequestWorkflowImpl implements DocumentRequestWorkflow {
       step(Steps.EVALUATE_RULES);
       // Routing runs in an Activity: the rules are read from outside, and the decision (with
       // the rules version that made it) is recorded in history. In-flight requests keep it.
-      RoutingDecision route = activities.evaluateRules(doc, docType, costApproved);
+      RoutingDecision route = activities.evaluateRules(new EvaluateRulesInput(doc, docType, costApproved));
       Workflow.upsertTypedSearchAttributes(
           PATH.valueSet(route.path().value()), RULES_VERSION.valueSet((long) route.rulesVersion()));
       log.info("{} routed to path {} by rules v{}: {}", doc.documentId(), route.path(), route.rulesVersion(), route.reason());
@@ -147,7 +147,7 @@ public class DocumentRequestWorkflowImpl implements DocumentRequestWorkflow {
 
   /** The reviewer turned the request down: tell the requester and end, with nothing else to undo. */
   private RequestOutcome rejectedByReviewer(DocumentRequest doc, RoutingDecision route, ReviewDecision review) {
-    activities.notifyRequester(doc, "rejected by " + review.reviewer());
+    activities.notifyRequester(new NotifyRequesterInput(doc, "rejected by " + review.reviewer()));
     step(Steps.REJECTED);
     return new RequestOutcome(RequestOutcome.REJECTED, route.path(), route.rulesVersion(),
         "Rejected by " + review.reviewer());
@@ -166,7 +166,7 @@ public class DocumentRequestWorkflowImpl implements DocumentRequestWorkflow {
     }
 
     step(Steps.NOTIFY);
-    activities.notifyRequester(doc, "posted to the ERP, reference " + erpConfirmation.postingId());
+    activities.notifyRequester(new NotifyRequesterInput(doc, "posted to the ERP, reference " + erpConfirmation.postingId()));
     return finish(doc, route, "Posted to the ERP, requester notified");
   }
 
@@ -203,7 +203,7 @@ public class DocumentRequestWorkflowImpl implements DocumentRequestWorkflow {
       }
       throw e;
     }
-    activities.notifyRequester(doc, "purchase order sent to the supplier portal");
+    activities.notifyRequester(new NotifyRequesterInput(doc, "purchase order sent to the supplier portal"));
     return finish(doc, route, "Cost center checked, purchase order sent to the supplier portal");
   }
 
