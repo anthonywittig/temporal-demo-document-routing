@@ -27,7 +27,7 @@ public class DocumentRequestWorkflowImpl implements DocumentRequestWorkflow {
   private static final Logger log = Workflow.getLogger(DocumentRequestWorkflowImpl.class);
 
   /**
-   * A request that keeps coming back to a person (only possible if a unit's default path is A)
+   * A request that keeps coming back to a person (only possible if a unit's default path is HumanReview)
    * stops after this many rounds instead of looping forever.
    */
   static final int MAX_ROUNDS = 5;
@@ -53,11 +53,11 @@ public class DocumentRequestWorkflowImpl implements DocumentRequestWorkflow {
   private final DocumentActivities activities =
       Workflow.newActivityStub(DocumentActivities.class, ACTIVITY_OPTIONS);
 
-  // Human task state (path A)
+  // Human review state
   private String openTaskId;
   private ReviewDecision decision;
 
-  // The ERP's asynchronous confirmation (path B), set by a Signal from the callback
+  // The ERP's asynchronous confirmation, set by a Signal from the callback
   private ErpConfirmation erpConfirmation;
 
   public DocumentRequestWorkflowImpl(WorkflowSettings settings) {
@@ -80,11 +80,11 @@ public class DocumentRequestWorkflowImpl implements DocumentRequestWorkflow {
       // the rules version that made it) is recorded in history. In-flight requests keep it.
       RoutingDecision route = activities.evaluateRules(doc, docType, costApproved);
       Workflow.upsertTypedSearchAttributes(
-          PATH.valueSet(route.path().name()), RULES_VERSION.valueSet((long) route.rulesVersion()));
+          PATH.valueSet(route.path().value()), RULES_VERSION.valueSet((long) route.rulesVersion()));
       log.info("{} routed to path {} by rules v{}: {}", doc.documentId(), route.path(), route.rulesVersion(), route.reason());
 
       switch (route.path()) {
-        case A -> {
+        case HUMAN_REVIEW -> {
           ReviewDecision review = humanTask(doc, route, round);
           if (review.action() == ReviewAction.APPROVE) {
             // Back through the rules in force now, without the cost check that sent it here.
@@ -93,12 +93,12 @@ public class DocumentRequestWorkflowImpl implements DocumentRequestWorkflow {
           }
           return rejectedByReviewer(doc, route, review);
         }
-        case B -> {
-          pathB(doc);
+        case ERP_POSTING -> {
+          erpPosting(doc);
           return finish(doc, route, "Posted to the ERP, requester notified");
         }
-        case C -> {
-          return pathC(doc, route);
+        case EXTERNAL_CHECKS -> {
+          return externalChecks(doc, route);
         }
       }
     }
@@ -106,7 +106,7 @@ public class DocumentRequestWorkflowImpl implements DocumentRequestWorkflow {
         "Routed to a reviewer " + MAX_ROUNDS + " times; stopping for an operator to review", "TooManyRounds");
   }
 
-  // ---- Path A: human task -------------------------------------------------------------------
+  // ---- HumanReview: a person approves or rejects the cost -----------------------------------
 
   private ReviewDecision humanTask(DocumentRequest doc, RoutingDecision route, int round) {
     openTaskId = doc.documentId() + "-r" + round;
@@ -165,9 +165,9 @@ public class DocumentRequestWorkflowImpl implements DocumentRequestWorkflow {
         "Rejected by " + review.reviewer());
   }
 
-  // ---- Path B: ERP posting, asynchronous confirmation, notification ------------------------
+  // ---- ErpPosting: ERP posting, asynchronous confirmation, notification ---------------------
 
-  private void pathB(DocumentRequest doc) {
+  private void erpPosting(DocumentRequest doc) {
     step(Steps.POST_TO_ERP);
     activities.postInvoiceToErp(doc);
 
@@ -186,9 +186,9 @@ public class DocumentRequestWorkflowImpl implements DocumentRequestWorkflow {
     if (erpConfirmation == null) erpConfirmation = ack; // a repeated acknowledgement changes nothing
   }
 
-  // ---- Path C: cost-center check, budget reservation, purchase order, compensation ---------------
+  // ---- ExternalChecks: cost-center check, budget reservation, purchase order, compensation ------
 
-  private RequestOutcome pathC(DocumentRequest doc, RoutingDecision route) {
+  private RequestOutcome externalChecks(DocumentRequest doc, RoutingDecision route) {
     step(Steps.CHECK_COST_CENTER);
     // A 422 here (unknown cost center) is non-retryable: the Workflow fails at this step and
     // waits for an operator to fix the data and reset it.

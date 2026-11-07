@@ -20,14 +20,14 @@ public interface DocumentRequestWorkflow {
   @WorkflowMethod
   RequestOutcome process(DocumentRequest doc);
 
-  /** Path A: a reviewer approves or rejects the open task. Refused if the task isn't open. */
+  /** HumanReview: a reviewer approves or rejects the open task. Refused if the task isn't open. */
   @UpdateMethod(name = "Review")
   ReviewResult review(ReviewDecision decision);
 
   @UpdateValidatorMethod(updateName = "Review")
   void validateReview(ReviewDecision decision);
 
-  /** Path B: the ERP's confirmation of the posting, delivered by callback. */
+  /** ErpPosting: the ERP's confirmation of the posting, delivered by callback. */
   @SignalMethod(name = "ErpPostingConfirmed")
   void erpPostingConfirmed(ErpConfirmation ack);
 }

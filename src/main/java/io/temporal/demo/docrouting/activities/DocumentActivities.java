@@ -22,20 +22,20 @@ public interface DocumentActivities {
    */
   RoutingDecision evaluateRules(DocumentRequest doc, String docType, boolean costApproved);
 
-  /** Path B. Returns the ERP's posting ID; the confirmation arrives later as a Signal. */
+  /** ErpPosting. Returns the ERP's posting ID; the confirmation arrives later as a Signal. */
   String postInvoiceToErp(DocumentRequest doc);
 
-  /** Path B and A: tell the requester the outcome. */
+  /** Every path: tell the requester the outcome. */
   void notifyRequester(DocumentRequest doc, String message);
 
-  /** Path C: check the cost center. Fails without retry if it is unknown. */
+  /** ExternalChecks: check the cost center. Fails without retry if it is unknown. */
   void checkCostCenter(DocumentRequest doc);
 
   void reserveBudget(DocumentRequest doc);
 
   void releaseBudget(DocumentRequest doc);
 
-  /** Path C: send the purchase order to the supplier portal. Fails without retry if the supplier rejects it. */
+  /** ExternalChecks: send the purchase order to the supplier portal. Fails without retry if the supplier rejects it. */
   void sendPurchaseOrder(DocumentRequest doc);
 
   /** v2 only: archive the processed document. */
