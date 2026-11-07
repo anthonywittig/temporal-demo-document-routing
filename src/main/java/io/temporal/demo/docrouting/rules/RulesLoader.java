@@ -1,6 +1,5 @@
 package io.temporal.demo.docrouting.rules;
 
-import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.temporal.demo.docrouting.workflow.Route;
@@ -26,10 +25,11 @@ public final class RulesLoader {
   private static final ObjectMapper JSON =
       new ObjectMapper().enable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES);
 
-  public record UnitRules(
-      long humanReviewAbove,
-      List<String> purchaseOrderFor,
-      @JsonProperty("default") Route defaultPath) {}
+  /**
+   * A unit's rules: the cost above which a person must approve. The path follows from the
+   * document type alone ({@link #pathFor}).
+   */
+  public record UnitRules(long humanReviewAbove) {}
 
   public record Rules(int version, Map<String, UnitRules> businessUnits) {}
 
@@ -40,6 +40,13 @@ public final class RulesLoader {
   public static final class UnknownBusinessUnitException extends RuntimeException {
     public UnknownBusinessUnitException(String unit) {
       super("No routing rules for business unit " + unit);
+    }
+  }
+
+  /** No path handles the document's type: fixed by correcting the document or adding a path. */
+  public static final class UnknownDocumentTypeException extends RuntimeException {
+    public UnknownDocumentTypeException(String docType) {
+      super("No path for document type " + docType + "; only invoice and purchase-order are handled");
     }
   }
 
@@ -84,8 +91,9 @@ public final class RulesLoader {
   }
 
   /**
-   * Cost above the unit's human-review threshold goes to a person (HumanReview); otherwise document
-   * types listed for purchase orders go to PurchaseOrder; everything else takes the unit's default path.
+   * Cost above the unit's human-review threshold goes to a person (HumanReview); otherwise
+   * invoices go to Invoice and purchase orders to PurchaseOrder. Any other document type is
+   * refused, before it can reach a reviewer.
    */
   public RoutingDecision evaluate(String businessUnit, String docType, long cost) {
     return evaluate(businessUnit, docType, cost, false);
@@ -93,13 +101,14 @@ public final class RulesLoader {
 
   /**
    * As {@link #evaluate(String, String, long)}, but when {@code costApproved} is true a reviewer
-   * has already accepted the cost, so the human-review threshold is skipped and only the remaining
-   * rules decide the path.
+   * has already accepted the cost, so the human-review threshold is skipped and the document type
+   * alone decides the path.
    */
   public RoutingDecision evaluate(String businessUnit, String docType, long cost, boolean costApproved) {
     Rules rules = current();
     UnitRules unit = rules.businessUnits().get(businessUnit);
     if (unit == null) throw new UnknownBusinessUnitException(businessUnit);
+    Route path = pathFor(docType);
 
     if (!costApproved && cost > unit.humanReviewAbove()) {
       return new RoutingDecision(
@@ -110,16 +119,21 @@ public final class RulesLoader {
     String costNote = costApproved
         ? "cost %d approved by a reviewer".formatted(cost)
         : "cost %d is within %d".formatted(cost, unit.humanReviewAbove());
-    if (unit.purchaseOrderFor().contains(docType)) {
-      return new RoutingDecision(
-          Route.PURCHASE_ORDER,
-          "%s: %s documents go out as a purchase order (%s)".formatted(businessUnit, docType, costNote),
-          rules.version());
-    }
+    String action = path == Route.PURCHASE_ORDER ? "go out as a purchase order" : "are posted to the ERP";
     return new RoutingDecision(
-        unit.defaultPath(),
-        "%s: default path for %s (%s)".formatted(businessUnit, docType, costNote),
-        rules.version());
+        path, "%s: %s documents %s (%s)".formatted(businessUnit, docType, action, costNote), rules.version());
+  }
+
+  /**
+   * The path for a document whose cost needs no (further) approval. Never HumanReview: only the
+   * cost threshold sends a request to a person, so an approved request can't be sent back.
+   */
+  static Route pathFor(String docType) {
+    return switch (docType) {
+      case "invoice" -> Route.INVOICE;
+      case "purchase-order" -> Route.PURCHASE_ORDER;
+      default -> throw new UnknownDocumentTypeException(docType);
+    };
   }
 
   static List<String> validate(Rules rules) {
@@ -135,11 +149,6 @@ public final class RulesLoader {
         return;
       }
       if (unit.humanReviewAbove() < 0) problems.add(name + ".humanReviewAbove must not be negative");
-      if (unit.purchaseOrderFor() == null) problems.add(name + ".purchaseOrderFor is required");
-      if (unit.defaultPath() == null) problems.add(name + ".default must be one of " + Route.allValues());
-      // HumanReview is reached by the cost threshold. As a default it would send an approved
-      // request straight back to a reviewer, round after round.
-      if (unit.defaultPath() == Route.HUMAN_REVIEW) problems.add(name + ".default must not be HumanReview");
     });
     return problems;
   }

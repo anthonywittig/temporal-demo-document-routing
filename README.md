@@ -2,8 +2,8 @@
 
 A document arrives, is classified, and business-unit rules route it down one of three paths:
 
-- **`HumanReview`.** A reviewer rejects the request, which ends it, or approves its cost, which sends it back through the rules with the cost threshold waived, so it continues down `ErpPosting` or `PurchaseOrder`.
-- **`ErpPosting`.** The invoice is posted to the ERP, which confirms the posting asynchronously, and the requester is notified.
+- **`HumanReview`.** A reviewer rejects the request, which ends it, or approves its cost, which sends it back through the rules with the cost threshold waived, so it continues down `Invoice` or `PurchaseOrder`.
+- **`Invoice`.** The invoice is posted to the ERP, which confirms the posting asynchronously, and the requester is notified.
 - **`PurchaseOrder`.** The purchase order's cost center is checked synchronously, budget is reserved, and the PO is sent to the supplier portal. If the supplier rejects it, the budget reservation is released.
 
 Each document is one Temporal Workflow. You can stop the worker, take the external systems down, change routing rules live, and ship a new worker version while requests are in flight, and nothing is lost or done twice.
@@ -31,7 +31,7 @@ make worker     # the Temporal worker (version v1)
 make web        # the demo app at http://localhost:8080
 ```
 
-The first `make systems`, `make worker`, or `make web` copies the default rules and reference data into `data/`. Those copies are what changes live during the demo. The page's **Routing rules** card edits the per-unit thresholds in `data/rules.json`, and you can edit the file by hand too. **Reset demo data** on the page, or `make reset-data`, restores the defaults; the page button also clears the system fault toggles.
+The first `make systems`, `make worker`, or `make web` copies the default rules and reference data into `data/`. Those copies are what changes live during the demo. The page's **Routing rules** card edits the per-unit thresholds in `data/rules.json`, and you can edit the file by hand too. **Reset demo data** on the page, or `make reset-data`, restores the defaults; the page button also clears the system fault toggles. The rules hold only those thresholds. Below its unit's threshold, a document's path follows from its type: invoices go to `Invoice` and purchase orders to `PurchaseOrder`. Any other type fails at `EvaluateRules` without retrying, before it reaches a reviewer.
 
 The dev server keeps everything in memory. Stopping `make temporal` clears every request.
 

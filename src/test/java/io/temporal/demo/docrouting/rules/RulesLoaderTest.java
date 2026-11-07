@@ -18,8 +18,8 @@ class RulesLoaderTest {
   static final String V1 = """
       { "version": 1,
         "businessUnits": {
-          "Services": { "humanReviewAbove": 5000, "purchaseOrderFor": ["purchase-order"], "default": "ErpPosting" },
-          "Equipment": { "humanReviewAbove": 1000, "purchaseOrderFor": ["purchase-order"], "default": "ErpPosting" } } }
+          "Services": { "humanReviewAbove": 5000 },
+          "Equipment": { "humanReviewAbove": 1000 } } }
       """;
 
   @BeforeEach
@@ -39,7 +39,7 @@ class RulesLoaderTest {
   void sameCostRoutesDifferentlyPerBusinessUnit() {
     var services = loader.evaluate("Services", "invoice", 3000);
     var equipment = loader.evaluate("Equipment", "invoice", 3000);
-    assertEquals(Route.ERP_POSTING, services.path());
+    assertEquals(Route.INVOICE, services.path());
     assertEquals(Route.HUMAN_REVIEW, equipment.path());
     assertEquals(1, services.rulesVersion());
     assertTrue(equipment.reason().contains("1000"), equipment.reason());
@@ -48,14 +48,26 @@ class RulesLoaderTest {
   @Test
   void eachPath() {
     assertEquals(Route.HUMAN_REVIEW, loader.evaluate("Services", "invoice", 12000).path());
-    assertEquals(Route.ERP_POSTING, loader.evaluate("Services", "invoice", 300).path());
+    assertEquals(Route.INVOICE, loader.evaluate("Services", "invoice", 300).path());
     assertEquals(Route.PURCHASE_ORDER, loader.evaluate("Equipment", "purchase-order", 800).path());
+  }
+
+  @Test
+  void documentTypeAloneChoosesBetweenInvoiceAndPurchaseOrder() {
+    for (String unit : new String[] {"Services", "Equipment"}) {
+      assertEquals(Route.PURCHASE_ORDER, loader.evaluate(unit, "purchase-order", 500).path(), unit);
+      assertEquals(Route.INVOICE, loader.evaluate(unit, "invoice", 500).path(), unit);
+    }
+    var po = loader.evaluate("Equipment", "purchase-order", 800);
+    assertEquals("Equipment: purchase-order documents go out as a purchase order (cost 800 is within 1000)", po.reason());
+    var invoice = loader.evaluate("Services", "invoice", 300);
+    assertEquals("Services: invoice documents are posted to the ERP (cost 300 is within 5000)", invoice.reason());
   }
 
   @Test
   void approvedCostSkipsTheHumanReviewThreshold() {
     var approvedInvoice = loader.evaluate("Services", "invoice", 12000, true);
-    assertEquals(Route.ERP_POSTING, approvedInvoice.path());
+    assertEquals(Route.INVOICE, approvedInvoice.path());
     assertTrue(approvedInvoice.reason().contains("approved by a reviewer"), approvedInvoice.reason());
     assertEquals(Route.PURCHASE_ORDER, loader.evaluate("Equipment", "purchase-order", 12000, true).path());
     assertEquals(Route.HUMAN_REVIEW, loader.evaluate("Services", "invoice", 12000, false).path());
@@ -69,7 +81,7 @@ class RulesLoaderTest {
 
   @Test
   void liveEditTakesEffectOnNextEvaluation() throws IOException {
-    assertEquals(Route.ERP_POSTING, loader.evaluate("Services", "invoice", 3000).path());
+    assertEquals(Route.INVOICE, loader.evaluate("Services", "invoice", 3000).path());
     Files.writeString(file, V1.replace("\"version\": 1", "\"version\": 2").replace("5000", "2000"));
     var decision = loader.evaluate("Services", "invoice", 3000);
     assertEquals(Route.HUMAN_REVIEW, decision.path());
@@ -94,27 +106,18 @@ class RulesLoaderTest {
   }
 
   @Test
-  void unknownPathNameIsRejected() throws IOException {
-    loader.current();
-    Files.writeString(file, V1.replace("\"version\": 1", "\"version\": 2").replace("\"ErpPosting\"", "\"Z\""));
-    assertEquals(1, loader.current().version());
-    assertTrue(loader.status().lastRejection().contains("must be one of HumanReview, ErpPosting, PurchaseOrder"),
-        loader.status().lastRejection());
-  }
-
-  @Test
-  void humanReviewDefaultIsRejected() throws IOException {
-    loader.current();
-    Files.writeString(file, V1.replace("\"version\": 1", "\"version\": 2")
-        .replace("\"default\": \"ErpPosting\" },", "\"default\": \"HumanReview\" },"));
-    assertEquals(1, loader.current().version());
-    assertTrue(loader.status().lastRejection().contains("Services.default must not be HumanReview"),
-        loader.status().lastRejection());
+  void unknownDocumentTypeIsRefusedBeforeTheCostCheck() {
+    var e = assertThrows(RulesLoader.UnknownDocumentTypeException.class,
+        () -> loader.evaluate("Services", "contract", 500));
+    assertTrue(e.getMessage().contains("contract"), e.getMessage());
+    // Above the threshold too: it fails now rather than after a reviewer approves it.
+    assertThrows(RulesLoader.UnknownDocumentTypeException.class, () -> loader.evaluate("Services", "contract", 99000));
   }
 
   @Test
   void pathNamesRoundTrip() {
     for (var r : Route.values()) assertEquals(r, Route.fromValue(r.value()));
+    assertNull(Route.fromValue("ErpPosting"));
   }
 
   @Test
@@ -124,7 +127,7 @@ class RulesLoaderTest {
     Files.writeString(file, V1);
     var decision = loader.evaluate("Services", "invoice", 3000);
     assertEquals(1, decision.rulesVersion());
-    assertEquals(Route.ERP_POSTING, decision.path());
+    assertEquals(Route.INVOICE, decision.path());
   }
 
   @Test
