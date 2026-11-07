@@ -11,8 +11,11 @@ import java.util.List;
 public enum Route {
   /** A reviewer rejects the request, or approves its cost and sends it on through the rules. */
   HUMAN_REVIEW("HumanReview", "A"),
-  /** The invoice is posted to the ERP, which confirms asynchronously, then the requester is notified. */
-  ERP_POSTING("ErpPosting", "B"),
+  /**
+   * The invoice is posted to the ERP, which confirms asynchronously, then the requester is notified.
+   * Formerly ErpPosting: requests started under that name still read it.
+   */
+  INVOICE("Invoice", "B", "ErpPosting"),
   /**
    * Cost-center check, budget reservation, then the purchase order is sent to the supplier portal.
    * Formerly ExternalChecks: requests started under that name still read it.

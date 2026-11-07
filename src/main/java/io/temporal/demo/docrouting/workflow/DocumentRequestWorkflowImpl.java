@@ -90,8 +90,8 @@ public class DocumentRequestWorkflowImpl implements DocumentRequestWorkflow {
           }
           return rejectedByReviewer(doc, route, review);
         }
-        case ERP_POSTING -> {
-          erpPosting(doc);
+        case INVOICE -> {
+          invoice(doc);
           return finish(doc, route, "Posted to the ERP, requester notified");
         }
         case PURCHASE_ORDER -> {
@@ -160,9 +160,9 @@ public class DocumentRequestWorkflowImpl implements DocumentRequestWorkflow {
         "Rejected by " + review.reviewer());
   }
 
-  // ---- ErpPosting: ERP posting, asynchronous confirmation, notification ---------------------
+  // ---- Invoice: ERP posting, asynchronous confirmation, notification ------------------------
 
-  private void erpPosting(DocumentRequest doc) {
+  private void invoice(DocumentRequest doc) {
     step(Steps.POST_TO_ERP);
     activities.postInvoiceToErp(doc);
 

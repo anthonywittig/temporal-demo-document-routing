@@ -22,7 +22,7 @@ public interface DocumentActivities {
    */
   RoutingDecision evaluateRules(DocumentRequest doc, String docType, boolean costApproved);
 
-  /** ErpPosting. Returns the ERP's posting ID; the confirmation arrives later as a Signal. */
+  /** Invoice: post it to the ERP. Returns the ERP's posting ID; the confirmation arrives later as a Signal. */
   String postInvoiceToErp(DocumentRequest doc);
 
   /** Every path: tell the requester the outcome. */

@@ -11,7 +11,6 @@ import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -35,9 +34,6 @@ public final class RulesLoader {
   @JsonIgnoreProperties({"purchaseOrderFor", "externalChecksFor", "default"})
   public record UnitRules(long humanReviewAbove) {}
 
-  /** Document types that go out as a purchase order; every other type is posted to the ERP. */
-  static final Set<String> PURCHASE_ORDER_TYPES = Set.of("purchase-order");
-
   public record Rules(int version, Map<String, UnitRules> businessUnits) {}
 
   /** What the web app shows: the rules in force and the most recent rejected edit, if any. */
@@ -47,6 +43,13 @@ public final class RulesLoader {
   public static final class UnknownBusinessUnitException extends RuntimeException {
     public UnknownBusinessUnitException(String unit) {
       super("No routing rules for business unit " + unit);
+    }
+  }
+
+  /** No path handles the document's type: fixed by correcting the document or adding a path. */
+  public static final class UnknownDocumentTypeException extends RuntimeException {
+    public UnknownDocumentTypeException(String docType) {
+      super("No path for document type " + docType + "; only invoice and purchase-order are handled");
     }
   }
 
@@ -91,8 +94,9 @@ public final class RulesLoader {
   }
 
   /**
-   * Cost above the unit's human-review threshold goes to a person (HumanReview); otherwise purchase
-   * orders go to PurchaseOrder and every other document type to ErpPosting.
+   * Cost above the unit's human-review threshold goes to a person (HumanReview); otherwise
+   * invoices go to Invoice and purchase orders to PurchaseOrder. Any other document type is
+   * refused, before it can reach a reviewer.
    */
   public RoutingDecision evaluate(String businessUnit, String docType, long cost) {
     return evaluate(businessUnit, docType, cost, false);
@@ -107,6 +111,7 @@ public final class RulesLoader {
     Rules rules = current();
     UnitRules unit = rules.businessUnits().get(businessUnit);
     if (unit == null) throw new UnknownBusinessUnitException(businessUnit);
+    Route path = pathFor(docType);
 
     if (!costApproved && cost > unit.humanReviewAbove()) {
       return new RoutingDecision(
@@ -117,7 +122,6 @@ public final class RulesLoader {
     String costNote = costApproved
         ? "cost %d approved by a reviewer".formatted(cost)
         : "cost %d is within %d".formatted(cost, unit.humanReviewAbove());
-    Route path = pathFor(docType);
     String action = path == Route.PURCHASE_ORDER ? "go out as a purchase order" : "are posted to the ERP";
     return new RoutingDecision(
         path, "%s: %s documents %s (%s)".formatted(businessUnit, docType, action, costNote), rules.version());
@@ -128,7 +132,11 @@ public final class RulesLoader {
    * cost threshold sends a request to a person, so an approved request can't be sent back.
    */
   static Route pathFor(String docType) {
-    return PURCHASE_ORDER_TYPES.contains(docType) ? Route.PURCHASE_ORDER : Route.ERP_POSTING;
+    return switch (docType) {
+      case "invoice" -> Route.INVOICE;
+      case "purchase-order" -> Route.PURCHASE_ORDER;
+      default -> throw new UnknownDocumentTypeException(docType);
+    };
   }
 
   static List<String> validate(Rules rules) {

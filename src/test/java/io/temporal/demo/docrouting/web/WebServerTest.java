@@ -36,7 +36,7 @@ class WebServerTest {
   @TempDir Path dir;
   TestWorkflowEnvironment env;
   WebServer web;
-  final FakeActivities fake = new FakeActivities().route(Route.ERP_POSTING, 1);
+  final FakeActivities fake = new FakeActivities().route(Route.INVOICE, 1);
 
   @BeforeEach
   void setUp() throws Exception {

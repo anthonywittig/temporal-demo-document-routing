@@ -27,7 +27,7 @@ public interface DocumentRequestWorkflow {
   @UpdateValidatorMethod(updateName = "Review")
   void validateReview(ReviewDecision decision);
 
-  /** ErpPosting: the ERP's confirmation of the posting, delivered by callback. */
+  /** Invoice: the ERP's confirmation of the posting, delivered by callback. */
   @SignalMethod(name = "ErpPostingConfirmed")
   void erpPostingConfirmed(ErpConfirmation ack);
 }

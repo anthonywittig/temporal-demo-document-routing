@@ -101,19 +101,19 @@ class DocumentRequestWorkflowTest {
     assertEquals(List.of("Classify", "EvaluateRules"), fake.calls());
   }
 
-  // ---- ErpPosting ----------------------------------------------------------------------------
+  // ---- Invoice -------------------------------------------------------------------------------
 
   @Test
-  void pathBWaitsForErpConfirmationThenNotifies() throws Exception {
+  void invoiceWaitsForErpConfirmationThenNotifies() throws Exception {
     start(false);
-    fake.route(Route.ERP_POSTING, 1);
+    fake.route(Route.INVOICE, 1);
     var wf = begin(doc("b1", "Services", "invoice", 3000));
     awaitStep(wf, Steps.AWAIT_ERP_CONFIRMATION);
     assertFalse(fake.calls().contains("NotifyRequester"), "must not notify before the acknowledgement");
     wf.erpPostingConfirmed(new ErpConfirmation("A-test", "now"));
     RequestOutcome outcome = result(wf);
     assertEquals(RequestOutcome.COMPLETED, outcome.status());
-    assertEquals(Route.ERP_POSTING, outcome.path());
+    assertEquals(Route.INVOICE, outcome.path());
     assertEquals(List.of("Classify", "EvaluateRules", "PostInvoiceToErp", "NotifyRequester"), fake.calls());
     assertEquals(Steps.COMPLETED, step(wf));
   }
@@ -121,7 +121,7 @@ class DocumentRequestWorkflowTest {
   @Test
   void acknowledgementArrivingEarlyIsKept() {
     start(false);
-    fake.route(Route.ERP_POSTING, 1);
+    fake.route(Route.INVOICE, 1);
     var wf = begin(doc("b2", "Services", "invoice", 3000));
     wf.erpPostingConfirmed(new ErpConfirmation("A-test", "now"));
     wf.erpPostingConfirmed(new ErpConfirmation("A-dup", "later")); // duplicate is ignored
@@ -132,7 +132,7 @@ class DocumentRequestWorkflowTest {
   @Test
   void missingErpConfirmationFailsTheStep() {
     start(false);
-    fake.route(Route.ERP_POSTING, 1);
+    fake.route(Route.INVOICE, 1);
     var wf = begin(doc("b3", "Services", "invoice", 3000));
     var e = assertThrows(WorkflowFailedException.class, () -> result(wf));
     assertEquals("CallbackTimeout", ((ApplicationFailure) e.getCause()).getType());
@@ -161,7 +161,7 @@ class DocumentRequestWorkflowTest {
   @Test
   void approveReEvaluatesUnderCurrentRulesWithoutTheCostCheck() throws Exception {
     start(false);
-    fake.route(Route.HUMAN_REVIEW, 1).route(Route.ERP_POSTING, 2); // the rules change while the task is open
+    fake.route(Route.HUMAN_REVIEW, 1).route(Route.INVOICE, 2); // the rules change while the task is open
     var wf = begin(doc("a2", "Equipment", "invoice", 3000));
     awaitStep(wf, Steps.HUMAN_TASK);
     ReviewResult r = wf.review(new ReviewDecision("a2-r1", ReviewAction.APPROVE, "Sam", "worth it"));
@@ -170,7 +170,7 @@ class DocumentRequestWorkflowTest {
     wf.erpPostingConfirmed(new ErpConfirmation("A-test", "now"));
     RequestOutcome outcome = result(wf);
     assertEquals(RequestOutcome.COMPLETED, outcome.status());
-    assertEquals(Route.ERP_POSTING, outcome.path());
+    assertEquals(Route.INVOICE, outcome.path());
     assertEquals(2, outcome.rulesVersion());
     assertEquals(List.of(false, true), fake.costApprovedFlags, "the second evaluation must skip the cost check");
   }
@@ -267,7 +267,7 @@ class DocumentRequestWorkflowTest {
   @Test
   void v1HasNoArchiveStep() {
     start(false);
-    fake.route(Route.ERP_POSTING, 1);
+    fake.route(Route.INVOICE, 1);
     var wf = begin(doc("v1", "Services", "invoice", 3000));
     wf.erpPostingConfirmed(new ErpConfirmation("A-test", "now"));
     result(wf);
@@ -277,7 +277,7 @@ class DocumentRequestWorkflowTest {
   @Test
   void v2ArchivesEveryCompletedRequest() {
     start(true);
-    fake.route(Route.ERP_POSTING, 1);
+    fake.route(Route.INVOICE, 1);
     var wf = begin(doc("v2", "Services", "invoice", 3000));
     wf.erpPostingConfirmed(new ErpConfirmation("A-test", "now"));
     result(wf);

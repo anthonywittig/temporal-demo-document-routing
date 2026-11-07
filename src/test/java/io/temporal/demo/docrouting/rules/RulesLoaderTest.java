@@ -39,7 +39,7 @@ class RulesLoaderTest {
   void sameCostRoutesDifferentlyPerBusinessUnit() {
     var services = loader.evaluate("Services", "invoice", 3000);
     var equipment = loader.evaluate("Equipment", "invoice", 3000);
-    assertEquals(Route.ERP_POSTING, services.path());
+    assertEquals(Route.INVOICE, services.path());
     assertEquals(Route.HUMAN_REVIEW, equipment.path());
     assertEquals(1, services.rulesVersion());
     assertTrue(equipment.reason().contains("1000"), equipment.reason());
@@ -48,16 +48,15 @@ class RulesLoaderTest {
   @Test
   void eachPath() {
     assertEquals(Route.HUMAN_REVIEW, loader.evaluate("Services", "invoice", 12000).path());
-    assertEquals(Route.ERP_POSTING, loader.evaluate("Services", "invoice", 300).path());
+    assertEquals(Route.INVOICE, loader.evaluate("Services", "invoice", 300).path());
     assertEquals(Route.PURCHASE_ORDER, loader.evaluate("Equipment", "purchase-order", 800).path());
   }
 
   @Test
-  void documentTypeAloneChoosesBetweenErpPostingAndPurchaseOrder() {
+  void documentTypeAloneChoosesBetweenInvoiceAndPurchaseOrder() {
     for (String unit : new String[] {"Services", "Equipment"}) {
       assertEquals(Route.PURCHASE_ORDER, loader.evaluate(unit, "purchase-order", 500).path(), unit);
-      assertEquals(Route.ERP_POSTING, loader.evaluate(unit, "invoice", 500).path(), unit);
-      assertEquals(Route.ERP_POSTING, loader.evaluate(unit, "contract", 500).path(), unit);
+      assertEquals(Route.INVOICE, loader.evaluate(unit, "invoice", 500).path(), unit);
     }
     var po = loader.evaluate("Equipment", "purchase-order", 800);
     assertEquals("Equipment: purchase-order documents go out as a purchase order (cost 800 is within 1000)", po.reason());
@@ -68,7 +67,7 @@ class RulesLoaderTest {
   @Test
   void approvedCostSkipsTheHumanReviewThreshold() {
     var approvedInvoice = loader.evaluate("Services", "invoice", 12000, true);
-    assertEquals(Route.ERP_POSTING, approvedInvoice.path());
+    assertEquals(Route.INVOICE, approvedInvoice.path());
     assertTrue(approvedInvoice.reason().contains("approved by a reviewer"), approvedInvoice.reason());
     assertEquals(Route.PURCHASE_ORDER, loader.evaluate("Equipment", "purchase-order", 12000, true).path());
     assertEquals(Route.HUMAN_REVIEW, loader.evaluate("Services", "invoice", 12000, false).path());
@@ -82,7 +81,7 @@ class RulesLoaderTest {
 
   @Test
   void liveEditTakesEffectOnNextEvaluation() throws IOException {
-    assertEquals(Route.ERP_POSTING, loader.evaluate("Services", "invoice", 3000).path());
+    assertEquals(Route.INVOICE, loader.evaluate("Services", "invoice", 3000).path());
     Files.writeString(file, V1.replace("\"version\": 1", "\"version\": 2").replace("5000", "2000"));
     var decision = loader.evaluate("Services", "invoice", 3000);
     assertEquals(Route.HUMAN_REVIEW, decision.path());
@@ -107,9 +106,20 @@ class RulesLoaderTest {
   }
 
   @Test
+  void unknownDocumentTypeIsRefusedBeforeTheCostCheck() {
+    var e = assertThrows(RulesLoader.UnknownDocumentTypeException.class,
+        () -> loader.evaluate("Services", "contract", 500));
+    assertTrue(e.getMessage().contains("contract"), e.getMessage());
+    // Above the threshold too: it fails now rather than after a reviewer approves it.
+    assertThrows(RulesLoader.UnknownDocumentTypeException.class, () -> loader.evaluate("Services", "contract", 99000));
+  }
+
+  @Test
   void pathNamesAndTheirOlderNamesParse() {
     for (var r : Route.values()) assertEquals(r, Route.fromValue(r.value()));
     assertEquals(Route.HUMAN_REVIEW, Route.fromValue("A"));
+    assertEquals(Route.INVOICE, Route.fromValue("B"));
+    assertEquals(Route.INVOICE, Route.fromValue("ErpPosting"));
     assertEquals(Route.PURCHASE_ORDER, Route.fromValue("C"));
     assertEquals(Route.PURCHASE_ORDER, Route.fromValue("ExternalChecks"));
   }
@@ -125,7 +135,7 @@ class RulesLoaderTest {
         """);
     assertEquals(1000, loader.current().businessUnits().get("Equipment").humanReviewAbove());
     assertNull(loader.status().lastRejection());
-    assertEquals(Route.ERP_POSTING, loader.evaluate("Equipment", "contract", 500).path());
+    assertEquals(Route.PURCHASE_ORDER, loader.evaluate("Services", "purchase-order", 500).path());
   }
 
   @Test
@@ -135,7 +145,7 @@ class RulesLoaderTest {
     Files.writeString(file, V1);
     var decision = loader.evaluate("Services", "invoice", 3000);
     assertEquals(1, decision.rulesVersion());
-    assertEquals(Route.ERP_POSTING, decision.path());
+    assertEquals(Route.INVOICE, decision.path());
   }
 
   @Test

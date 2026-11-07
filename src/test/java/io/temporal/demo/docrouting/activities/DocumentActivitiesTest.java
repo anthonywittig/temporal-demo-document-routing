@@ -74,7 +74,7 @@ class DocumentActivitiesTest {
     String type = activities.classify(SERVICES_INVOICE);
     assertEquals("invoice", type);
     var decision = activities.evaluateRules(SERVICES_INVOICE, type, false);
-    assertEquals(Route.ERP_POSTING, decision.path());
+    assertEquals(Route.INVOICE, decision.path());
     assertEquals(1, decision.rulesVersion());
   }
 
@@ -84,6 +84,15 @@ class DocumentActivitiesTest {
     var e = assertThrows(ActivityFailure.class, () -> activities.evaluateRules(doc, "invoice", false));
     var cause = (ApplicationFailure) e.getCause();
     assertTrue(cause.isNonRetryable());
+  }
+
+  @Test
+  void unknownDocumentTypeIsNonRetryable() {
+    var doc = new DocumentRequest("d4", "Services", "contract", 1, "CC-10", "Dana");
+    var e = assertThrows(ActivityFailure.class, () -> activities.evaluateRules(doc, "contract", false));
+    var cause = (ApplicationFailure) e.getCause();
+    assertTrue(cause.isNonRetryable());
+    assertTrue(cause.getOriginalMessage().contains("No path for document type contract"), cause.getOriginalMessage());
   }
 
   @Test
