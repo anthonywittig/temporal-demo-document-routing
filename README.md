@@ -31,7 +31,7 @@ make worker     # the Temporal worker (version v1)
 make web        # the demo app at http://localhost:8080
 ```
 
-The first `make systems`, `make worker`, or `make web` copies the default rules and reference data into `data/`. Those copies are what changes live during the demo. The page's **Routing rules** card edits the per-unit thresholds in `data/rules.json`, and you can edit the file by hand too. **Reset demo data** on the page, or `make reset-data`, restores the defaults; the page button also clears the system fault toggles. Rules files from before the `PurchaseOrder` rename, which say `externalChecksFor` and `ExternalChecks`, still load.
+The first `make systems`, `make worker`, or `make web` copies the default rules and reference data into `data/`. Those copies are what changes live during the demo. The page's **Routing rules** card edits the per-unit thresholds in `data/rules.json`, and you can edit the file by hand too. **Reset demo data** on the page, or `make reset-data`, restores the defaults; the page button also clears the system fault toggles.
 
 The dev server keeps everything in memory. Stopping `make temporal` clears every request.
 
