@@ -29,7 +29,10 @@ public class DocumentRequestWorkflowImpl implements DocumentRequestWorkflow {
   static final ActivityOptions ACTIVITY_OPTIONS =
       ActivityOptions.newBuilder()
           .setStartToCloseTimeout(Duration.ofSeconds(10))
-          .setRetryOptions(RetryOptions.newBuilder().setMaximumInterval(Duration.ofSeconds(10)).build())
+          .setRetryOptions(RetryOptions.newBuilder()
+              .setMaximumInterval(Duration.ofSeconds(10))
+              .setMaximumAttempts(20)
+              .build())
           .build();
 
   private final WorkflowSettings settings;
