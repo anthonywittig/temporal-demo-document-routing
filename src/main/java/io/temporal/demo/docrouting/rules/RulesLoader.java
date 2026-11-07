@@ -1,6 +1,5 @@
 package io.temporal.demo.docrouting.rules;
 
-import com.fasterxml.jackson.annotation.JsonAlias;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -29,8 +28,7 @@ public final class RulesLoader {
 
   public record UnitRules(
       long humanReviewAbove,
-      // Called externalChecksFor before the path was renamed; older rules files still load.
-      @JsonAlias("externalChecksFor") List<String> purchaseOrderFor,
+      List<String> purchaseOrderFor,
       @JsonProperty("default") Route defaultPath) {}
 
   public record Rules(int version, Map<String, UnitRules> businessUnits) {}

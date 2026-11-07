@@ -8,7 +8,7 @@
     },
     "Equipment": {
       "humanReviewAbove": 1000,
-      "purchaseOrderFor": ["purchase-order", "contract"],
+      "purchaseOrderFor": ["purchase-order"],
       "default": "ErpPosting"
     }
   }

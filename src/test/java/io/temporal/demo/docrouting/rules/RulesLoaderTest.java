@@ -6,7 +6,6 @@ import io.temporal.demo.docrouting.workflow.Route;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -20,7 +19,7 @@ class RulesLoaderTest {
       { "version": 1,
         "businessUnits": {
           "Services": { "humanReviewAbove": 5000, "purchaseOrderFor": ["purchase-order"], "default": "ErpPosting" },
-          "Equipment": { "humanReviewAbove": 1000, "purchaseOrderFor": ["purchase-order", "contract"], "default": "ErpPosting" } } }
+          "Equipment": { "humanReviewAbove": 1000, "purchaseOrderFor": ["purchase-order"], "default": "ErpPosting" } } }
       """;
 
   @BeforeEach
@@ -104,24 +103,8 @@ class RulesLoaderTest {
   }
 
   @Test
-  void olderRulesFilesWithPathLettersStillLoad() throws IOException {
-    Files.writeString(file, V1.replace("\"ErpPosting\"", "\"B\""));
-    assertEquals(Route.ERP_POSTING, loader.current().businessUnits().get("Services").defaultPath());
-    assertNull(loader.status().lastRejection());
+  void pathNamesRoundTrip() {
     for (var r : Route.values()) assertEquals(r, Route.fromValue(r.value()));
-    assertEquals(Route.HUMAN_REVIEW, Route.fromValue("A"));
-    assertEquals(Route.PURCHASE_ORDER, Route.fromValue("C"));
-    assertEquals(Route.PURCHASE_ORDER, Route.fromValue("ExternalChecks"));
-  }
-
-  @Test
-  void rulesFilesWrittenBeforeThePurchaseOrderRenameStillLoad() throws IOException {
-    Files.writeString(file, V1.replace("purchaseOrderFor", "externalChecksFor")
-        .replace("\"default\": \"ErpPosting\" } } }", "\"default\": \"ExternalChecks\" } } }"));
-    assertNull(loader.status().lastRejection());
-    var equipment = loader.current().businessUnits().get("Equipment");
-    assertEquals(List.of("purchase-order", "contract"), equipment.purchaseOrderFor());
-    assertEquals(Route.PURCHASE_ORDER, equipment.defaultPath());
   }
 
   @Test

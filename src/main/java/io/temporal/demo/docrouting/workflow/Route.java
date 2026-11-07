@@ -3,7 +3,6 @@ package io.temporal.demo.docrouting.workflow;
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonValue;
 import java.util.Arrays;
-import java.util.List;
 import java.util.stream.Collectors;
 
 /**
@@ -12,26 +11,16 @@ import java.util.stream.Collectors;
  */
 public enum Route {
   /** A reviewer rejects the request, or approves its cost and sends it on through the rules. */
-  HUMAN_REVIEW("HumanReview", "A"),
+  HUMAN_REVIEW("HumanReview"),
   /** The invoice is posted to the ERP, which confirms asynchronously, then the requester is notified. */
-  ERP_POSTING("ErpPosting", "B"),
-  /**
-   * Cost-center check, budget reservation, then the purchase order is sent to the supplier portal.
-   * Formerly ExternalChecks: requests started under that name, and rules files that use it, still
-   * read it.
-   */
-  PURCHASE_ORDER("PurchaseOrder", "C", "ExternalChecks");
+  ERP_POSTING("ErpPosting"),
+  /** Cost-center check, budget reservation, then the purchase order is sent to the supplier portal. */
+  PURCHASE_ORDER("PurchaseOrder");
 
   private final String value;
-  /**
-   * Earlier names for the path (its letter, and any name it had before), still accepted so older
-   * rules files and Workflow histories load.
-   */
-  private final List<String> legacyNames;
 
-  Route(String value, String... legacyNames) {
+  Route(String value) {
     this.value = value;
-    this.legacyNames = List.of(legacyNames);
   }
 
   @JsonValue
@@ -43,7 +32,7 @@ public enum Route {
   @JsonCreator
   public static Route fromValue(String s) {
     for (Route r : values()) {
-      if (r.value.equals(s) || r.legacyNames.contains(s)) return r;
+      if (r.value.equals(s)) return r;
     }
     return null;
   }
