@@ -38,7 +38,7 @@ class HistoryReplayTest {
   static final WorkflowSettings V1 = new WorkflowSettings(Duration.ofSeconds(60), Duration.ofMinutes(2), false);
 
   @ParameterizedTest
-  @ValueSource(strings = {"v1-human-review.json", "v1-erp-posting.json", "v1-external-checks-rejected.json"})
+  @ValueSource(strings = {"v1-human-review.json", "v1-erp-posting.json", "v1-purchase-order-rejected.json"})
   void v1HistoriesReplayAgainstCurrentCode(String fixture) throws Exception {
     String json;
     try (InputStream in = getClass().getResourceAsStream("/histories/" + fixture)) {
@@ -85,7 +85,7 @@ class HistoryReplayTest {
       awaitStep(wf, Steps.AWAIT_ERP_CONFIRMATION);
       wf.erpPostingConfirmed(new ErpConfirmation("ERP-rec", "now"));
     });
-    record("v1-external-checks-rejected.json", Route.EXTERNAL_CHECKS, true, (wf, client) -> {});
+    record("v1-purchase-order-rejected.json", Route.PURCHASE_ORDER, true, (wf, client) -> {});
   }
 
   interface Drive {

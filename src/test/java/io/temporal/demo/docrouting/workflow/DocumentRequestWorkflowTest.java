@@ -176,15 +176,15 @@ class DocumentRequestWorkflowTest {
   }
 
   @Test
-  void approvalCanStillEndInPathC() throws Exception {
+  void approvalCanStillEndInPurchaseOrder() throws Exception {
     start(false);
-    fake.route(Route.HUMAN_REVIEW, 1).route(Route.EXTERNAL_CHECKS, 1);
+    fake.route(Route.HUMAN_REVIEW, 1).route(Route.PURCHASE_ORDER, 1);
     var wf = begin(doc("a5", "Equipment", "purchase-order", 3000));
     awaitStep(wf, Steps.HUMAN_TASK);
     wf.review(new ReviewDecision("a5-r1", ReviewAction.APPROVE, "Sam", ""));
     RequestOutcome outcome = result(wf);
     assertEquals(RequestOutcome.COMPLETED, outcome.status());
-    assertEquals(Route.EXTERNAL_CHECKS, outcome.path());
+    assertEquals(Route.PURCHASE_ORDER, outcome.path());
     assertEquals(List.of("Classify", "EvaluateRules", "EvaluateRules", "CheckCostCenter",
         "ReserveBudget", "SendPurchaseOrder", "NotifyRequester"), fake.calls());
   }
@@ -225,12 +225,12 @@ class DocumentRequestWorkflowTest {
     assertEquals(RequestOutcome.REJECTED, result(wf).status());
   }
 
-  // ---- ExternalChecks ------------------------------------------------------------------------
+  // ---- PurchaseOrder -------------------------------------------------------------------------
 
   @Test
-  void pathCRunsChecksTasksAndFinalAction() throws Exception {
+  void purchaseOrderRunsChecksTasksAndFinalAction() throws Exception {
     start(false);
-    fake.route(Route.EXTERNAL_CHECKS, 1);
+    fake.route(Route.PURCHASE_ORDER, 1);
     var wf = begin(doc("c1", "Equipment", "purchase-order", 800));
     assertEquals(RequestOutcome.COMPLETED, result(wf).status());
     assertEquals(List.of("Classify", "EvaluateRules", "CheckCostCenter",
@@ -240,7 +240,7 @@ class DocumentRequestWorkflowTest {
   @Test
   void supplierRejectionReleasesTheBudget() throws Exception {
     start(false);
-    fake.route(Route.EXTERNAL_CHECKS, 1);
+    fake.route(Route.PURCHASE_ORDER, 1);
     fake.supplierRejects = true;
     var wf = begin(doc("c2", "Equipment", "purchase-order", 800));
     RequestOutcome outcome = result(wf);
@@ -253,7 +253,7 @@ class DocumentRequestWorkflowTest {
   @Test
   void unknownCostCenterFailsTheRequestAtCheckCostCenter() {
     start(false);
-    fake.route(Route.EXTERNAL_CHECKS, 1);
+    fake.route(Route.PURCHASE_ORDER, 1);
     fake.costCenterUnknown = true;
     var wf = begin(doc("c3", "Equipment", "purchase-order", 800));
     var e = assertThrows(WorkflowFailedException.class, () -> result(wf));

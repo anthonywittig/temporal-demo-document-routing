@@ -6,6 +6,7 @@ import io.temporal.demo.docrouting.workflow.Route;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -18,8 +19,8 @@ class RulesLoaderTest {
   static final String V1 = """
       { "version": 1,
         "businessUnits": {
-          "Services": { "humanReviewAbove": 5000, "externalChecksFor": ["purchase-order"], "default": "ErpPosting" },
-          "Equipment": { "humanReviewAbove": 1000, "externalChecksFor": ["purchase-order", "contract"], "default": "ErpPosting" } } }
+          "Services": { "humanReviewAbove": 5000, "purchaseOrderFor": ["purchase-order"], "default": "ErpPosting" },
+          "Equipment": { "humanReviewAbove": 1000, "purchaseOrderFor": ["purchase-order", "contract"], "default": "ErpPosting" } } }
       """;
 
   @BeforeEach
@@ -49,7 +50,7 @@ class RulesLoaderTest {
   void eachPath() {
     assertEquals(Route.HUMAN_REVIEW, loader.evaluate("Services", "invoice", 12000).path());
     assertEquals(Route.ERP_POSTING, loader.evaluate("Services", "invoice", 300).path());
-    assertEquals(Route.EXTERNAL_CHECKS, loader.evaluate("Equipment", "purchase-order", 800).path());
+    assertEquals(Route.PURCHASE_ORDER, loader.evaluate("Equipment", "purchase-order", 800).path());
   }
 
   @Test
@@ -57,7 +58,7 @@ class RulesLoaderTest {
     var approvedInvoice = loader.evaluate("Services", "invoice", 12000, true);
     assertEquals(Route.ERP_POSTING, approvedInvoice.path());
     assertTrue(approvedInvoice.reason().contains("approved by a reviewer"), approvedInvoice.reason());
-    assertEquals(Route.EXTERNAL_CHECKS, loader.evaluate("Equipment", "purchase-order", 12000, true).path());
+    assertEquals(Route.PURCHASE_ORDER, loader.evaluate("Equipment", "purchase-order", 12000, true).path());
     assertEquals(Route.HUMAN_REVIEW, loader.evaluate("Services", "invoice", 12000, false).path());
   }
 
@@ -98,7 +99,7 @@ class RulesLoaderTest {
     loader.current();
     Files.writeString(file, V1.replace("\"version\": 1", "\"version\": 2").replace("\"ErpPosting\"", "\"Z\""));
     assertEquals(1, loader.current().version());
-    assertTrue(loader.status().lastRejection().contains("must be one of HumanReview, ErpPosting, ExternalChecks"),
+    assertTrue(loader.status().lastRejection().contains("must be one of HumanReview, ErpPosting, PurchaseOrder"),
         loader.status().lastRejection());
   }
 
@@ -109,7 +110,18 @@ class RulesLoaderTest {
     assertNull(loader.status().lastRejection());
     for (var r : Route.values()) assertEquals(r, Route.fromValue(r.value()));
     assertEquals(Route.HUMAN_REVIEW, Route.fromValue("A"));
-    assertEquals(Route.EXTERNAL_CHECKS, Route.fromValue("C"));
+    assertEquals(Route.PURCHASE_ORDER, Route.fromValue("C"));
+    assertEquals(Route.PURCHASE_ORDER, Route.fromValue("ExternalChecks"));
+  }
+
+  @Test
+  void rulesFilesWrittenBeforeThePurchaseOrderRenameStillLoad() throws IOException {
+    Files.writeString(file, V1.replace("purchaseOrderFor", "externalChecksFor")
+        .replace("\"default\": \"ErpPosting\" } } }", "\"default\": \"ExternalChecks\" } } }"));
+    assertNull(loader.status().lastRejection());
+    var equipment = loader.current().businessUnits().get("Equipment");
+    assertEquals(List.of("purchase-order", "contract"), equipment.purchaseOrderFor());
+    assertEquals(Route.PURCHASE_ORDER, equipment.defaultPath());
   }
 
   @Test

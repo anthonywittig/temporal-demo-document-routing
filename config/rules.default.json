@@ -3,12 +3,12 @@
   "businessUnits": {
     "Services": {
       "humanReviewAbove": 5000,
-      "externalChecksFor": ["purchase-order"],
+      "purchaseOrderFor": ["purchase-order"],
       "default": "ErpPosting"
     },
     "Equipment": {
       "humanReviewAbove": 1000,
-      "externalChecksFor": ["purchase-order", "contract"],
+      "purchaseOrderFor": ["purchase-order", "contract"],
       "default": "ErpPosting"
     }
   }

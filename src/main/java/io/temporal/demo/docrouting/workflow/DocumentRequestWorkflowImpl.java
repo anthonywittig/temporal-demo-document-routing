@@ -97,8 +97,8 @@ public class DocumentRequestWorkflowImpl implements DocumentRequestWorkflow {
           erpPosting(doc);
           return finish(doc, route, "Posted to the ERP, requester notified");
         }
-        case EXTERNAL_CHECKS -> {
-          return externalChecks(doc, route);
+        case PURCHASE_ORDER -> {
+          return purchaseOrder(doc, route);
         }
       }
     }
@@ -186,9 +186,9 @@ public class DocumentRequestWorkflowImpl implements DocumentRequestWorkflow {
     if (erpConfirmation == null) erpConfirmation = ack; // a repeated acknowledgement changes nothing
   }
 
-  // ---- ExternalChecks: cost-center check, budget reservation, purchase order, compensation ------
+  // ---- PurchaseOrder: cost-center check, budget reservation, purchase order, compensation -------
 
-  private RequestOutcome externalChecks(DocumentRequest doc, RoutingDecision route) {
+  private RequestOutcome purchaseOrder(DocumentRequest doc, RoutingDecision route) {
     step(Steps.CHECK_COST_CENTER);
     // A 422 here (unknown cost center) is non-retryable: the Workflow fails at this step and
     // waits for an operator to fix the data and reset it.

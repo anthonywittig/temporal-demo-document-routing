@@ -3,6 +3,7 @@ package io.temporal.demo.docrouting.workflow;
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonValue;
 import java.util.Arrays;
+import java.util.List;
 import java.util.stream.Collectors;
 
 /**
@@ -14,16 +15,23 @@ public enum Route {
   HUMAN_REVIEW("HumanReview", "A"),
   /** The invoice is posted to the ERP, which confirms asynchronously, then the requester is notified. */
   ERP_POSTING("ErpPosting", "B"),
-  /** Cost-center check, budget reservation, then the purchase order is sent to the supplier portal. */
-  EXTERNAL_CHECKS("ExternalChecks", "C");
+  /**
+   * Cost-center check, budget reservation, then the purchase order is sent to the supplier portal.
+   * Formerly ExternalChecks: requests started under that name, and rules files that use it, still
+   * read it.
+   */
+  PURCHASE_ORDER("PurchaseOrder", "C", "ExternalChecks");
 
   private final String value;
-  /** What the path was called before it had a name, still accepted so older rules files load. */
-  private final String legacyLetter;
+  /**
+   * Earlier names for the path (its letter, and any name it had before), still accepted so older
+   * rules files and Workflow histories load.
+   */
+  private final List<String> legacyNames;
 
-  Route(String value, String legacyLetter) {
+  Route(String value, String... legacyNames) {
     this.value = value;
-    this.legacyLetter = legacyLetter;
+    this.legacyNames = List.of(legacyNames);
   }
 
   @JsonValue
@@ -35,12 +43,12 @@ public enum Route {
   @JsonCreator
   public static Route fromValue(String s) {
     for (Route r : values()) {
-      if (r.value.equals(s) || r.legacyLetter.equals(s)) return r;
+      if (r.value.equals(s) || r.legacyNames.contains(s)) return r;
     }
     return null;
   }
 
-  /** "HumanReview, ErpPosting, ExternalChecks", for error messages. */
+  /** "HumanReview, ErpPosting, PurchaseOrder", for error messages. */
   public static String allValues() {
     return Arrays.stream(values()).map(Route::value).collect(Collectors.joining(", "));
   }
