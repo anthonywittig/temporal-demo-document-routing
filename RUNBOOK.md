@@ -128,7 +128,7 @@ Thirty-second version: "A document comes in, is classified, and business-unit ru
 1. Tick **ERP is up**. It now reads **ERP is DOWN (503)**.
 2. Click **Services · invoice · $3,000**. The row stays at step **PostToErp**, status **Running**.
 3. Open it in the Temporal UI. Under **Pending Activities**, `PostInvoiceToErp` shows attempt 3, 4, 5… with `POST /erp/invoices returned HTTP 503: The ERP is unavailable` as the last failure.
-4. Say: "The ERP is down. The workflow isn't failing; it's retrying with exponential backoff, 1, 2, 4, up to 10 seconds, for as long as the outage lasts. Other requests aren't blocked behind this one. There's no queue head to get stuck."
+4. Say: "The ERP is down. The workflow isn't failing; it's retrying with exponential backoff, 1, 2, 4, up to 10 seconds, for about three minutes. Other requests aren't blocked behind this one. There's no queue head to get stuck."
 5. Press `Ctrl-C` in the `make worker` terminal. Now nothing is running the workflow either.
 6. Untick the toggle. It reads **ERP is up** again. The request is still waiting, because there's no worker.
 7. Start `make worker` again. Within about 15 seconds, the next retry succeeds, the ERP's confirmation arrives, and the request completes.
@@ -214,7 +214,7 @@ Every side-effecting call also sends `Idempotency-Key: <workflowId>/<activity ty
 
 ### Routing runs in an Activity, and the decision is recorded
 
-[`DocumentRequestWorkflowImpl.java` lines 76–82](src/main/java/io/temporal/demo/docrouting/workflow/DocumentRequestWorkflowImpl.java#L76-L82):
+[`DocumentRequestWorkflowImpl.java` lines 68–74](src/main/java/io/temporal/demo/docrouting/workflow/DocumentRequestWorkflowImpl.java#L68-L74):
 
 ```java
 RoutingDecision route = activities.evaluateRules(doc, docType, costApproved);
@@ -226,7 +226,7 @@ The rules file is read on every evaluation and validated, and the last good vers
 
 ### A human task: an Update with a validator
 
-[`DocumentRequestWorkflowImpl.java` lines 137–155](src/main/java/io/temporal/demo/docrouting/workflow/DocumentRequestWorkflowImpl.java#L137-L155):
+[`DocumentRequestWorkflowImpl.java` lines 129–147](src/main/java/io/temporal/demo/docrouting/workflow/DocumentRequestWorkflowImpl.java#L129-L147):
 
 ```java
 public void validateReview(ReviewDecision d) {
@@ -241,7 +241,7 @@ A rejected Update is never written to history. An accepted one carries the revie
 
 ### An SLA that flags without cancelling
 
-[`DocumentRequestWorkflowImpl.java` lines 121–134](src/main/java/io/temporal/demo/docrouting/workflow/DocumentRequestWorkflowImpl.java#L121-L134):
+[`DocumentRequestWorkflowImpl.java` lines 113–126](src/main/java/io/temporal/demo/docrouting/workflow/DocumentRequestWorkflowImpl.java#L113-L126):
 
 ```java
 CancellationScope sla = Workflow.newCancellationScope(() ->
@@ -256,7 +256,7 @@ sla.cancel();
 
 ### Turn a callback into a Signal
 
-The web app receives the ERP's confirmation callback and signals the workflow ([`WebServer.java` lines 224–240](src/main/java/io/temporal/demo/docrouting/web/WebServer.java#L224-L240)). The workflow waits with a deadline ([`DocumentRequestWorkflowImpl.java` lines 167–178](src/main/java/io/temporal/demo/docrouting/workflow/DocumentRequestWorkflowImpl.java#L167-L178)):
+The web app receives the ERP's confirmation callback and signals the workflow ([`WebServer.java` lines 224–240](src/main/java/io/temporal/demo/docrouting/web/WebServer.java#L224-L240)). The workflow waits with a deadline ([`DocumentRequestWorkflowImpl.java` lines 159–170](src/main/java/io/temporal/demo/docrouting/workflow/DocumentRequestWorkflowImpl.java#L159-L170)):
 
 ```java
 // a named timer, so the Temporal UI shows "WaitForErpConfirmation (2m)"
@@ -267,7 +267,7 @@ if (!awaitWithTimer(settings.callbackTimeout(), "WaitForErpConfirmation", () -> 
 
 ### Let the failure decide whether to retry
 
-[`HttpCalls.java` lines 51–60](src/main/java/io/temporal/demo/docrouting/activities/HttpCalls.java#L51-L60), with the policy in [`DocumentRequestWorkflowImpl.java` lines 34–44](src/main/java/io/temporal/demo/docrouting/workflow/DocumentRequestWorkflowImpl.java#L34-L44):
+[`HttpCalls.java` lines 51–60](src/main/java/io/temporal/demo/docrouting/activities/HttpCalls.java#L51-L60), with the policy in [`DocumentRequestWorkflowImpl.java` lines 29–36](src/main/java/io/temporal/demo/docrouting/workflow/DocumentRequestWorkflowImpl.java#L29-L36):
 
 ```java
 if (isRetryable(status)) throw ApplicationFailure.newFailure(message, TRANSIENT);   // 5xx, 408, 429
@@ -276,7 +276,7 @@ throw ApplicationFailure.newNonRetryableFailure(message, REJECTED);             
 
 ### Undo completed steps
 
-[`DocumentRequestWorkflowImpl.java` lines 194–215](src/main/java/io/temporal/demo/docrouting/workflow/DocumentRequestWorkflowImpl.java#L194-L215):
+[`DocumentRequestWorkflowImpl.java` lines 186–207](src/main/java/io/temporal/demo/docrouting/workflow/DocumentRequestWorkflowImpl.java#L186-L207):
 
 ```java
 Saga saga = new Saga(new Saga.Options.Builder().setParallelCompensation(false).build());
@@ -288,7 +288,7 @@ catch (ActivityFailure e) { saga.compensate(); ... }
 
 ### Progress you can search, and an inbox that needs no worker
 
-The workflow keeps `Step` current at every step ([`DocumentRequestWorkflowImpl.java` line 249](src/main/java/io/temporal/demo/docrouting/workflow/DocumentRequestWorkflowImpl.java#L249-L251)), and puts the task details in its memo ([line 117](src/main/java/io/temporal/demo/docrouting/workflow/DocumentRequestWorkflowImpl.java#L112-L117)). The inbox is a visibility query, not a Query, so it works with no worker running ([`WebServer.java` lines 254–261](src/main/java/io/temporal/demo/docrouting/web/WebServer.java#L254-L261)):
+The workflow keeps `Step` current at every step ([`DocumentRequestWorkflowImpl.java` line 241](src/main/java/io/temporal/demo/docrouting/workflow/DocumentRequestWorkflowImpl.java#L241-L243)), and puts the task details in its memo ([line 109](src/main/java/io/temporal/demo/docrouting/workflow/DocumentRequestWorkflowImpl.java#L105-L109)). The inbox is a visibility query, not a Query, so it works with no worker running ([`WebServer.java` lines 254–261](src/main/java/io/temporal/demo/docrouting/web/WebServer.java#L254-L261)):
 
 ```java
 client.listExecutions("WorkflowType=\"DocumentRequestWorkflow\" AND ExecutionStatus=\"Running\" AND Step=\"HumanTask\"")
@@ -339,6 +339,7 @@ WorkerDeploymentOptions.newBuilder()
 |---|---|---|
 | Banner "Reconnecting to Temporal…" | The web app can't reach the dev server | Start `make up`, then refresh |
 | **External systems** card is red, "unreachable" | The systems process isn't running | `make systems` (or `make up` if nothing is running) |
+| A request shows **Failed** at step **PostToErp** (or another external step) | The external system was down longer than the retry bound, about 3 minutes (20 attempts) | Bring the system back (untick **ERP is DOWN**, or start `make systems`), then replay as in beat 7: `temporal workflow reset --disable-config-file --query 'ExecutionStatus="Failed" AND Step="PostToErp"' --type FirstWorkflowTask --reason "ERP back" --yes` |
 | An `Invoice` request sits at **PostToErp** with attempts climbing | The **ERP is DOWN (503)** toggle is still on, perhaps from beat 5 | Untick it; the next retry succeeds |
 | A new request stays at step **Received** | No worker is running, or the deployment has no current version | `make worker`. If it's running, check `temporal worker deployment describe --name document-routing --disable-config-file` and `make promote BUILD_ID=v1` |
 | Toast "No worker has accepted the decision yet…" | The worker is stopped | Start `make worker`. The decision is applied when it starts; clicking again is safe |
