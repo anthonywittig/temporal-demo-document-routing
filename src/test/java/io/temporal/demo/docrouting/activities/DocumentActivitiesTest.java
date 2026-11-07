@@ -8,6 +8,8 @@ import io.javalin.Javalin;
 import io.temporal.demo.docrouting.rules.RulesLoader;
 import io.temporal.demo.docrouting.systems.SystemsServer;
 import io.temporal.demo.docrouting.workflow.DocumentRequest;
+import io.temporal.demo.docrouting.workflow.EvaluateRulesInput;
+import io.temporal.demo.docrouting.workflow.NotifyRequesterInput;
 import io.temporal.demo.docrouting.workflow.Route;
 import io.temporal.failure.ActivityFailure;
 import io.temporal.failure.ApplicationFailure;
@@ -73,7 +75,7 @@ class DocumentActivitiesTest {
   void classifyAndRoute() {
     String type = activities.classify(SERVICES_INVOICE);
     assertEquals("invoice", type);
-    var decision = activities.evaluateRules(SERVICES_INVOICE, type, false);
+    var decision = activities.evaluateRules(new EvaluateRulesInput(SERVICES_INVOICE, type, false));
     assertEquals(Route.INVOICE, decision.path());
     assertEquals(1, decision.rulesVersion());
   }
@@ -81,7 +83,7 @@ class DocumentActivitiesTest {
   @Test
   void unknownBusinessUnitIsNonRetryable() {
     var doc = new DocumentRequest("d3", "BU9", "invoice", 1, "CC-10", "Dana");
-    var e = assertThrows(ActivityFailure.class, () -> activities.evaluateRules(doc, "invoice", false));
+    var e = assertThrows(ActivityFailure.class, () -> activities.evaluateRules(new EvaluateRulesInput(doc, "invoice", false)));
     var cause = (ApplicationFailure) e.getCause();
     assertTrue(cause.isNonRetryable());
   }
@@ -89,7 +91,7 @@ class DocumentActivitiesTest {
   @Test
   void unknownDocumentTypeIsNonRetryable() {
     var doc = new DocumentRequest("d4", "Services", "contract", 1, "CC-10", "Dana");
-    var e = assertThrows(ActivityFailure.class, () -> activities.evaluateRules(doc, "contract", false));
+    var e = assertThrows(ActivityFailure.class, () -> activities.evaluateRules(new EvaluateRulesInput(doc, "contract", false)));
     var cause = (ApplicationFailure) e.getCause();
     assertTrue(cause.isNonRetryable());
     assertTrue(cause.getOriginalMessage().contains("No path for document type contract"), cause.getOriginalMessage());
@@ -118,7 +120,7 @@ class DocumentActivitiesTest {
     activities.reserveBudget(SERVICES_INVOICE);
     activities.reserveBudget(SERVICES_INVOICE); // same workflow + activity type => same key
     activities.releaseBudget(SERVICES_INVOICE);
-    activities.notifyRequester(SERVICES_INVOICE, "done");
+    activities.notifyRequester(new NotifyRequesterInput(SERVICES_INVOICE, "done"));
     JsonNode effects = effects();
     assertEquals(3, effects.size(), effects.toString());
     assertEquals("Reserve budget", effects.get(0).get("action").asText());

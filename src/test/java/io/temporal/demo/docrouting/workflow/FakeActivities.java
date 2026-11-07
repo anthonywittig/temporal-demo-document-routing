@@ -39,9 +39,9 @@ public class FakeActivities implements DocumentActivities {
   }
 
   @Override
-  public synchronized RoutingDecision evaluateRules(DocumentRequest doc, String docType, boolean costApproved) {
+  public synchronized RoutingDecision evaluateRules(EvaluateRulesInput input) {
     record();
-    costApprovedFlags.add(costApproved);
+    costApprovedFlags.add(input.costApproved());
     // The last scripted decision repeats once the script runs out.
     return decisions.size() > 1 ? decisions.poll() : decisions.peek();
   }
@@ -53,7 +53,7 @@ public class FakeActivities implements DocumentActivities {
   }
 
   @Override
-  public void notifyRequester(DocumentRequest doc, String message) {
+  public void notifyRequester(NotifyRequesterInput input) {
     record();
   }
 
