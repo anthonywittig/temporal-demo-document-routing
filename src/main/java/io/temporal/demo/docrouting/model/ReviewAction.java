@@ -1,4 +1,4 @@
-package io.temporal.demo.docrouting.workflow;
+package io.temporal.demo.docrouting.model;
 
 public enum ReviewAction {
   /**

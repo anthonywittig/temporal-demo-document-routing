@@ -1,10 +1,8 @@
 package io.temporal.demo.docrouting.activities;
 
 import io.temporal.activity.ActivityInterface;
-import io.temporal.demo.docrouting.workflow.DocumentRequest;
-import io.temporal.demo.docrouting.workflow.EvaluateRulesInput;
-import io.temporal.demo.docrouting.workflow.NotifyRequesterInput;
-import io.temporal.demo.docrouting.workflow.RoutingDecision;
+import io.temporal.demo.docrouting.model.DocumentRequest;
+import io.temporal.demo.docrouting.model.RoutingDecision;
 
 /**
  * Every step that touches the outside world. Side-effecting calls send an Idempotency-Key of
