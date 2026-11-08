@@ -350,9 +350,7 @@ public final class WebServer {
   private void putRules(Context ctx) throws Exception {
     JsonNode body = JSON.readTree(ctx.body()).path("thresholds");
     Map<String, Long> thresholds = new LinkedHashMap<>();
-    var fields = body.fields();
-    while (fields.hasNext()) {
-      var field = fields.next();
+    for (var field : body.properties()) {
       if (!field.getValue().canConvertToLong() || !field.getValue().isIntegralNumber()) {
         ctx.status(400).json(Map.of("error", field.getKey() + " threshold must be a whole number"));
         return;
