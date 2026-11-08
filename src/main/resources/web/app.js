@@ -275,7 +275,7 @@ function renderViews() {
   const views = [
     ["Waiting on a person", 'Step="HumanTask" AND ExecutionStatus="Running"'],
     ["SLA breached", "SlaBreached=true"],
-    ["Failed at the cost-center check", 'ExecutionStatus="Failed" AND Step="CheckCostCenter"'],
+    ["Failed at budget reservation", 'ExecutionStatus="Failed" AND Step="ReserveBudget"'],
     ["Waiting for the ERP to confirm", 'Step="AwaitErpConfirmation" AND ExecutionStatus="Running"'],
     ["Rejected (by a reviewer or the supplier)", 'Step="Rejected"'],
     ["Services", 'BusinessUnit="Services"'],

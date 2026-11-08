@@ -33,9 +33,8 @@ import org.slf4j.LoggerFactory;
  *
  * <ul>
  *   <li>The ERP accepts an invoice posting at once and confirms it later, by calling back.
- *   <li>The cost-center check answers synchronously, against reference data read from
- *       a JSON file on every call.
- *   <li>Budget reservation and its undo.
+ *   <li>Budget reservation and its undo. A reservation is refused (422) when its cost center
+ *       isn't in the reference data, read from a JSON file on every call.
  *   <li>The supplier portal accepts a purchase order, or rejects it when told to.
  *   <li>A notification service and an archive.
  * </ul>
@@ -78,8 +77,7 @@ public final class SystemsServer {
     app = Javalin.create(cfg -> cfg.showJavalinBanner = false);
 
     app.post("/erp/invoices", this::erpPostInvoice);
-    app.post("/cost-centers/check", this::costCenterCheck);
-    app.post("/tasks/reserve-budget", ctx -> recordEffect(ctx, "Budget", "Reserve budget"));
+    app.post("/tasks/reserve-budget", this::reserveBudget);
     app.post("/tasks/reserve-budget/undo", ctx -> recordEffect(ctx, "Budget", "Release budget (undo)"));
     app.post("/supplier-portal/purchase-orders", this::sendPurchaseOrder);
     app.post("/notify", ctx -> recordEffect(ctx, "Notifications", "Notify requester"));
@@ -131,23 +129,24 @@ public final class SystemsServer {
     });
   }
 
-  // ---- Cost-center check -------------------------------------------------------------------------
+  // ---- Budget -----------------------------------------------------------------------------------
 
-  private void costCenterCheck(Context ctx) throws IOException {
+  private void reserveBudget(Context ctx) throws IOException {
     JsonNode body = body(ctx);
-    String costCenter = text(body, "costCenter");
-    String problem = costCenterProblem(costCenter);
+    // Checked before the idempotency store, so a refusal isn't remembered: once the cost center
+    // is added to the reference data, a retry or reset with the same key reserves the budget.
+    String problem = costCenterProblem(text(body, "costCenter"));
     if (problem != null) {
       ctx.status(422).json(Map.of("error", problem));
       return;
     }
-    ctx.json(Map.of("result", "PASS", "costCenter", costCenter));
+    recordEffect(ctx, "Budget", "Reserve budget");
   }
 
   /** Returns null when the cost center is known, otherwise the reason it isn't. */
   private String costCenterProblem(String costCenter) {
     Set<String> known = referenceCostCenters();
-    return known.contains(costCenter) ? null : "Cost-center check: unknown cost center " + costCenter;
+    return known.contains(costCenter) ? null : "Budget: unknown cost center " + costCenter;
   }
 
   private Set<String> referenceCostCenters() {
@@ -157,7 +156,7 @@ public final class SystemsServer {
       root.path("costCenters").forEach(n -> out.add(n.asText()));
       return out;
     } catch (IOException e) {
-      // Unreadable reference data is the cost-center check's own outage: callers see a 500 and retry.
+      // Unreadable reference data is the budget service's own outage: callers see a 500 and retry.
       throw new IllegalStateException("Cost-center reference data unavailable: " + e.getMessage(), e);
     }
   }

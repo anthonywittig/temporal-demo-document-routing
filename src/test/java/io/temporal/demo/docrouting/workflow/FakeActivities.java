@@ -58,17 +58,12 @@ public class FakeActivities implements DocumentActivities {
   }
 
   @Override
-  public void checkCostCenter(DocumentRequest doc) {
+  public void reserveBudget(DocumentRequest doc) {
     record();
     if (costCenterUnknown) {
       throw ApplicationFailure.newNonRetryableFailure(
-          "Cost-center check: unknown cost center " + doc.costCenter(), HttpCalls.REJECTED);
+          "Budget: unknown cost center " + doc.costCenter(), HttpCalls.REJECTED);
     }
-  }
-
-  @Override
-  public void reserveBudget(DocumentRequest doc) {
-    record();
   }
 
   @Override
