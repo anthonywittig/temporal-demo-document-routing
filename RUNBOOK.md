@@ -159,13 +159,31 @@ Thirty-second version: "A document comes in, is classified, and business-unit ru
    ```sh
    temporal workflow reset --disable-config-file \
      --query 'ExecutionStatus="Failed" AND Step="ReserveBudget"' \
-     --type FirstWorkflowTask --reason "CC-99 added to the cost-center reference data" --yes
+     --type FirstWorkflowTask --reason "CC-99 added to the cost-center reference data"
    ```
 
+   The CLI asks `Start batch against approximately 3 workflow(s)? y/N`. Check that the count matches step 6, then type `y`.
 8. Within about 15 seconds, the three documents show **Completed** in **Recent requests**.
 9. Open one in the Temporal UI. The new run starts with a reset event carrying your reason and links back to the original run. Point at the **Reset** button on a workflow page: that's the same replay for a single request.
 10. Say: "One query found everything that failed for this reason, and one command replayed all of it, with the reason on record. The original failed runs stay as the audit trail; the fix is a new run linked to each one. That's diagnosis, correction, replay and audit, without a separate queue to run."
 11. If someone notices that **Failed at budget reservation** still lists three runs: those are the original runs, kept on purpose. Their documents now each have a newer, completed run.
+12. Don't run the step 7 command a second time. The original failed runs still match its query, so a second run replays those documents again: each one reserves budget and sends its purchase order twice.
+13. Optional, to replay only some documents. A visibility query can't say "skip documents that already have a completed run", so name them yourself. A document's workflow ID is `doc-` followed by its document ID. To list the failed runs except those of documents already replayed:
+
+    ```sh
+    temporal workflow list --disable-config-file \
+      --query 'ExecutionStatus="Failed" AND Step="ReserveBudget" AND WorkflowId NOT IN ("doc-DLVX5")'
+    ```
+
+    To reset a batch of two by ID:
+
+    ```sh
+    temporal workflow reset --disable-config-file \
+      --query 'ExecutionStatus="Failed" AND WorkflowId IN ("doc-DJVWO", "doc-D5B03")' \
+      --type FirstWorkflowTask --reason "CC-99 added to the cost-center reference data"
+    ```
+
+    Keep `ExecutionStatus="Failed"` in the reset query. Without it, the query also matches any completed run those documents have, and the reset replays that too.
 
 ### 7. Ship v2 while v1 requests are still open
 
@@ -340,7 +358,7 @@ WorkerDeploymentOptions.newBuilder()
 |---|---|---|
 | Banner "Reconnecting to Temporal…" | The web app can't reach the dev server | Start `make up`, then refresh |
 | **External systems** card is red, "unreachable" | The systems process isn't running | `make systems` (or `make up` if nothing is running) |
-| A request shows **Failed** at step **PostToErp** (or another external step) | The external system was down longer than the retry bound, about 3 minutes (20 attempts) | Bring the system back (untick **ERP is DOWN**, or start `make systems`), then replay as in beat 6: `temporal workflow reset --disable-config-file --query 'ExecutionStatus="Failed" AND Step="PostToErp"' --type FirstWorkflowTask --reason "ERP back" --yes` |
+| A request shows **Failed** at step **PostToErp** (or another external step) | The external system was down longer than the retry bound, about 3 minutes (20 attempts) | Bring the system back (untick **ERP is DOWN**, or start `make systems`), then replay as in beat 6: `temporal workflow reset --disable-config-file --query 'ExecutionStatus="Failed" AND Step="PostToErp"' --type FirstWorkflowTask --reason "ERP back"`, and type `y` to confirm |
 | An `Invoice` request sits at **PostToErp** with attempts climbing | The **ERP is DOWN (503)** toggle is still on, perhaps from beat 4 | Untick it; the next retry succeeds |
 | A new request stays at step **Received** | No worker is running, or the deployment has no current version | `make worker`. If it's running, check `temporal worker deployment describe --name document-routing --disable-config-file` and `make promote BUILD_ID=v1` |
 | Toast "No worker has accepted the decision yet…" | The worker is stopped | Start `make worker`. The decision is applied when it starts; clicking again is safe |
@@ -349,7 +367,8 @@ WorkerDeploymentOptions.newBuilder()
 | Rules badge is amber and a banner says the edit was rejected | `data/rules.json` doesn't parse or validate | Fix the file, or save from the **Routing rules** card, which writes a valid file; the banner names the problem. The last good version stays in force meanwhile |
 | After `make worker BUILD_ID=v2`, new requests still show **v1** | v2 isn't current yet | `make promote BUILD_ID=v2` |
 | **Failed at budget reservation** still lists runs after the reset | Expected: those are the original failed runs, kept as the record | Each document has a newer completed run; open one to show the link |
-| The batch reset command matches nothing | CC-99 requests haven't failed yet, or you already reset them | Wait for **Failed**, or run the `temporal workflow list` query from beat 6 first |
+| The batch reset command matches nothing | CC-99 requests haven't failed yet | Wait for **Failed**, or run the `temporal workflow list` query from beat 6 first |
+| A CC-99 document has two completed runs after beat 6 | The reset command ran twice. The original failed runs still match its query, so the second run replayed them again | Nothing to clean up in the demo. Next time, replay only documents that haven't completed: filter by workflow ID as in beat 6, step 13 |
 | `make` fails with "release version 21 not supported" | Maven is running an older JDK | Put JDK 21 or later first on your `PATH`; the Makefile uses that JDK |
 
 ## Keeping this runbook current
