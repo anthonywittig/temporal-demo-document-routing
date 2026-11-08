@@ -4,18 +4,17 @@ This runbook is for presenting the demo. The [README](README.md) explains what i
 
 ## What it shows
 
-A document arrives, is classified, and business-unit rules route it down one of three paths: `HumanReview`, a human task; `Invoice`, an ERP posting with an asynchronous confirmation and a notification; or `PurchaseOrder`, a cost-center check, a budget reservation and a purchase order sent to the supplier portal. Each document is one `DocumentRequestWorkflow`.
+A document arrives, is classified, and business-unit rules route it down one of three paths: `HumanReview`, a human task; `Invoice`, an ERP posting with an asynchronous confirmation and a notification; or `PurchaseOrder`, a budget reservation against the PO's cost center and a purchase order sent to the supplier portal. Each document is one `DocumentRequestWorkflow`.
 
 The external systems:
 
 | System | What it does here | Path |
 |---|---|---|
 | **ERP** | Accepts the invoice posting now and confirms it about 4 seconds later, by callback | `Invoice` |
-| **Cost-center check** | Checks synchronously that the PO's cost center exists in the reference data; 422 if not | `PurchaseOrder` |
-| Budget reservation | Commits the money before the PO goes out; undone if the supplier rejects | `PurchaseOrder` |
+| **Budget** | Reserves the money against the PO's cost center before the PO goes out; 422 if the cost center isn't in the reference data. Undone if the supplier rejects | `PurchaseOrder` |
 | **Supplier portal** | Receives the purchase order; the supplier may reject it | `PurchaseOrder` |
 
-The story: an invoice is posted to the ERP, which confirms later, and the requester is notified. A purchase order has its cost center checked and budget reserved, then goes to the supplier portal; if the supplier says no, the budget is released.
+The story: an invoice is posted to the ERP, which confirms later, and the requester is notified. A purchase order has budget reserved against its cost center, then goes to the supplier portal; if the supplier says no, the budget is released.
 
 During the talk you change the rules live, stop the worker and the external systems, break and fix reference data, and ship a second worker version. Nothing is lost, and nothing is done twice.
 
@@ -68,7 +67,7 @@ Open the **Temporal UI ↗** link in the second tab.
 
 Everything the page shows comes from Temporal's visibility store. The page keeps no state of its own. Click any document ID to open that request in the Temporal UI.
 
-Thirty-second version: "A document comes in, is classified, and business-unit rules send it to a person, post it to the ERP, or, for a purchase order, check the cost center and send it to the supplier. Every document is a durable workflow. I'm going to change the rules while it runs, take the worker and the external systems away, break the data, and ship a new version, and you'll see nothing lost and nothing done twice."
+Thirty-second version: "A document comes in, is classified, and business-unit rules send it to a person, post it to the ERP, or, for a purchase order, reserve the budget and send it to the supplier. Every document is a durable workflow. I'm going to change the rules while it runs, take the worker and the external systems away, break the data, and ship a new version, and you'll see nothing lost and nothing done twice."
 
 | Beat | Minutes | Compress if short on time |
 |---|---|---|
@@ -134,7 +133,6 @@ Thirty-second version: "A document comes in, is classified, and business-unit ru
 1. Tick **Supplier portal accepts purchase orders**. It now reads **Supplier portal REJECTS purchase orders**.
 2. Click **Equipment · purchase order · $800**. It goes down `PurchaseOrder`, and the row ends at step **Rejected**.
 3. Open it in the Temporal UI:
-   - `CheckCostCenter` passes;
    - `ReserveBudget` runs;
    - `SendPurchaseOrder` fails without retry;
    - then `ReleaseBudget`.
@@ -143,23 +141,23 @@ Thirty-second version: "A document comes in, is classified, and business-unit ru
 
 ### 6. Bad data: find, fix, replay in bulk
 
-1. Click **3 × cost center CC-99**. Three requests start and almost at once show status **Failed**, at step **CheckCostCenter**.
-2. Click **Failed at the cost-center check** under **Temporal UI views**. The Temporal UI lists all three.
-3. Open one. The failure says `POST /cost-centers/check returned HTTP 422: Cost-center check: unknown cost center CC-99`. Point out that `CheckCostCenter` ran once: a 422 is never retried.
+1. Click **3 × cost center CC-99**. Three requests start and almost at once show status **Failed**, at step **ReserveBudget**.
+2. Click **Failed at budget reservation** under **Temporal UI views**. The Temporal UI lists all three.
+3. Open one. The failure says `POST /tasks/reserve-budget returned HTTP 422: Budget: unknown cost center CC-99`. Point out that `ReserveBudget` ran once: a 422 is never retried. And there's no `ReleaseBudget`: nothing was reserved, so there's nothing to undo.
 4. Say: "This is where a dead-letter queue would come in. Here, the failed request is the record: input, error, and where it stopped, searchable alongside everything else. And nothing else was blocked behind it."
 5. Fix the data. In `data/reference-data.json`, add `"CC-99"` to `costCenters` and save. Nothing needs restarting.
 6. In the third terminal, replay every request that failed this way:
 
    ```sh
    temporal workflow reset --disable-config-file \
-     --query 'ExecutionStatus="Failed" AND Step="CheckCostCenter"' \
+     --query 'ExecutionStatus="Failed" AND Step="ReserveBudget"' \
      --type FirstWorkflowTask --reason "CC-99 added to the cost-center reference data" --yes
    ```
 
 7. Within about 15 seconds, the three documents show **Completed** in **Recent requests**.
 8. Open one in the Temporal UI. The new run starts with a reset event carrying your reason and links back to the original run. Point at the **Reset** button on a workflow page: that's the same replay for a single request.
 9. Say: "One query found everything that failed for this reason, and one command replayed all of it, with the reason on record. The original failed runs stay as the audit trail; the fix is a new run linked to each one. That's diagnosis, correction, replay and audit, without a separate queue to run."
-10. If someone notices that **Failed at the cost-center check** still lists three runs: those are the original runs, kept on purpose. Their documents now each have a newer, completed run.
+10. If someone notices that **Failed at budget reservation** still lists three runs: those are the original runs, kept on purpose. Their documents now each have a newer, completed run.
 
 ### 7. Ship v2 while v1 requests are still open
 
@@ -204,7 +202,7 @@ static String workflowId(String documentId) { return "doc-" + documentId; }
 } catch (WorkflowExecutionAlreadyStarted e) { /* duplicate: nothing new starts */ }
 ```
 
-Every side-effecting call also sends `Idempotency-Key: <workflowId>/<activity type>` ([`DocumentActivitiesImpl.java` line 101](src/main/java/io/temporal/demo/docrouting/activities/DocumentActivitiesImpl.java#L101)). The key is the same across retries and resets.
+Every side-effecting call also sends `Idempotency-Key: <workflowId>/<activity type>` ([`DocumentActivitiesImpl.java` line 96](src/main/java/io/temporal/demo/docrouting/activities/DocumentActivitiesImpl.java#L96)). The key is the same across retries and resets.
 
 ### Routing runs in an Activity, and the decision is recorded
 
@@ -270,7 +268,7 @@ throw ApplicationFailure.newNonRetryableFailure(message, REJECTED);             
 
 ### Undo completed steps
 
-[`DocumentRequestWorkflowImpl.java` lines 186–207](src/main/java/io/temporal/demo/docrouting/workflow/DocumentRequestWorkflowImpl.java#L186-L207):
+[`DocumentRequestWorkflowImpl.java` lines 181–205](src/main/java/io/temporal/demo/docrouting/workflow/DocumentRequestWorkflowImpl.java#L181-L205):
 
 ```java
 Saga saga = new Saga(new Saga.Options.Builder().setParallelCompensation(false).build());
@@ -282,7 +280,7 @@ catch (ActivityFailure e) { saga.compensate(); ... }
 
 ### Progress you can search, and an inbox that needs no worker
 
-The workflow keeps `Step` current at every step ([`DocumentRequestWorkflowImpl.java` line 241](src/main/java/io/temporal/demo/docrouting/workflow/DocumentRequestWorkflowImpl.java#L241-L243)), and puts the task details in its memo ([line 109](src/main/java/io/temporal/demo/docrouting/workflow/DocumentRequestWorkflowImpl.java#L105-L109)). The inbox is a visibility query, not a Query, so it works with no worker running ([`WebServer.java` lines 242–249](src/main/java/io/temporal/demo/docrouting/web/WebServer.java#L242-L249)):
+The workflow keeps `Step` current at every step ([`DocumentRequestWorkflowImpl.java` line 239](src/main/java/io/temporal/demo/docrouting/workflow/DocumentRequestWorkflowImpl.java#L239-L241)), and puts the task details in its memo ([line 109](src/main/java/io/temporal/demo/docrouting/workflow/DocumentRequestWorkflowImpl.java#L105-L109)). The inbox is a visibility query, not a Query, so it works with no worker running ([`WebServer.java` lines 242–249](src/main/java/io/temporal/demo/docrouting/web/WebServer.java#L242-L249)):
 
 ```java
 client.listExecutions("WorkflowType=\"DocumentRequestWorkflow\" AND ExecutionStatus=\"Running\" AND Step=\"HumanTask\"")
@@ -342,7 +340,7 @@ WorkerDeploymentOptions.newBuilder()
 | The page shows **rules v2** (or later) right after starting | An earlier rehearsal's edits are still in `data/` | Click **Reset demo data** |
 | Rules badge is amber and a banner says the edit was rejected | `data/rules.json` doesn't parse or validate | Fix the file, or save from the **Routing rules** card, which writes a valid file; the banner names the problem. The last good version stays in force meanwhile |
 | After `make worker BUILD_ID=v2`, new requests still show **v1** | v2 isn't current yet | `make promote BUILD_ID=v2` |
-| **Failed at the cost-center check** still lists runs after the reset | Expected: those are the original failed runs, kept as the record | Each document has a newer completed run; open one to show the link |
+| **Failed at budget reservation** still lists runs after the reset | Expected: those are the original failed runs, kept as the record | Each document has a newer completed run; open one to show the link |
 | The batch reset command matches nothing | CC-99 requests haven't failed yet, or you already reset them | Wait for **Failed**, or check the query in the Temporal UI first |
 | `make` fails with "release version 21 not supported" | Maven is running an older JDK | Put JDK 21 or later first on your `PATH`; the Makefile uses that JDK |
 

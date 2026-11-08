@@ -4,7 +4,7 @@ A document arrives, is classified, and business-unit rules route it down one of 
 
 - **`HumanReview`.** A reviewer rejects the request, which ends it, or approves its cost, which sends it back through the rules in force now, so it continues down `Invoice` or `PurchaseOrder`. The approval only counts if those rules still put the cost above the threshold; if a rule change has since brought the cost within it, the request is routed by the new rules alone.
 - **`Invoice`.** The invoice is posted to the ERP, which confirms the posting asynchronously, and the requester is notified.
-- **`PurchaseOrder`.** The purchase order's cost center is checked synchronously, budget is reserved, and the PO is sent to the supplier portal. If the supplier rejects it, the budget reservation is released.
+- **`PurchaseOrder`.** Budget is reserved against the purchase order's cost center, which fails without retrying if the cost center is unknown, and the PO is sent to the supplier portal. If the supplier rejects it, the budget reservation is released.
 
 Each document is one Temporal Workflow. You can stop the worker, take the external systems down, change routing rules live, and ship a new worker version while requests are in flight, and nothing is lost or done twice.
 
@@ -32,7 +32,7 @@ make worker     # the Temporal worker (version v1)
 `make up` runs three processes in one terminal, and `Ctrl-C` stops all three:
 
 - the Temporal dev server, with its UI at http://localhost:8233;
-- the mock ERP, cost-center check, supplier portal and notifications on :8090;
+- the mock ERP, budget service, supplier portal and notifications on :8090;
 - the demo app at http://localhost:8080.
 
 The worker runs on its own because the demo stops and restarts it. To run the other three in separate terminals instead, use `make temporal`, `make systems` and `make web`.
@@ -48,8 +48,7 @@ Every external system runs in one process on :8090. `make stop-systems` stops it
 | Endpoint | Behaves like |
 |---|---|
 | `POST /erp/invoices` | ERP: accepts the invoice posting with `202` at once, then POSTs the confirmation to the `callbackUrl` after `ERP_CONFIRM_DELAY`. It retries the callback until the receiver answers 2xx |
-| `POST /cost-centers/check` | Cost-center check, synchronous: `200` if the cost center is in `data/reference-data.json`, otherwise `422 unknown cost center` |
-| `POST /tasks/reserve-budget` (and `/undo`) | The `PurchaseOrder` budget reservation and its compensation |
+| `POST /tasks/reserve-budget` (and `/undo`) | The `PurchaseOrder` budget reservation and its compensation. A reservation is refused with `422 unknown cost center` if the cost center isn't in `data/reference-data.json`; a refusal isn't stored against its `Idempotency-Key`, so a retry or reset after the fix goes through |
 | `POST /supplier-portal/purchase-orders` | Supplier portal: `200` (PO accepted), or `422` while it's set to reject |
 | `POST /notify`, `POST /archive` | Notification service and archive |
 | `GET`/`PUT /control` | Fault toggles: `{"erpDown": false, "supplierRejects": false}` |
@@ -57,7 +56,7 @@ Every external system runs in one process on :8090. `make stop-systems` stops it
 
 Side-effecting calls honor an `Idempotency-Key` header: a repeat gets the first response and causes no second effect. That store is in memory, so restarting the process clears it.
 
-`data/reference-data.json` is read on every check. Adding a cost center there fixes later checks without a restart.
+`data/reference-data.json` is read on every reservation. Adding a cost center there fixes later reservations without a restart.
 
 ## Configuration
 

@@ -175,18 +175,16 @@ public class DocumentRequestWorkflowImpl implements DocumentRequestWorkflow {
     if (erpConfirmation == null) erpConfirmation = ack; // a repeated acknowledgement changes nothing
   }
 
-  // ---- PurchaseOrder: cost-center check, budget reservation, purchase order, compensation -------
+  // ---- PurchaseOrder: budget reservation, purchase order, compensation -------------------------
 
   private RequestOutcome purchaseOrder(DocumentRequest doc, RoutingDecision route) {
-    step(Steps.CHECK_COST_CENTER);
-    // A 422 here (unknown cost center) is non-retryable: the Workflow fails at this step and
-    // waits for an operator to fix the data and reset it.
-    activities.checkCostCenter(doc);
-
     // Each side-effecting step registers its undo as soon as it has succeeded. There is one
     // today; more steps would register theirs the same way and be undone in reverse order.
     Saga saga = new Saga(new Saga.Options.Builder().setParallelCompensation(false).build());
     step(Steps.RESERVE_BUDGET);
+    // A 422 here (unknown cost center) is non-retryable: nothing has been done yet, so there is
+    // nothing to undo. The Workflow fails at this step and waits for an operator to fix the data
+    // and reset it.
     activities.reserveBudget(doc);
     saga.addCompensation(activities::releaseBudget, doc);
 
@@ -204,7 +202,7 @@ public class DocumentRequestWorkflowImpl implements DocumentRequestWorkflow {
       throw e;
     }
     activities.notifyRequester(new NotifyRequesterInput(doc, "purchase order sent to the supplier portal"));
-    return finish(doc, route, "Cost center checked, purchase order sent to the supplier portal");
+    return finish(doc, route, "Budget reserved, purchase order sent to the supplier portal");
   }
 
   // ---- shared -------------------------------------------------------------------------------

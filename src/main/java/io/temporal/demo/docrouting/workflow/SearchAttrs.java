@@ -26,7 +26,6 @@ public final class SearchAttrs {
     public static final String POST_TO_ERP = "PostToErp";
     public static final String AWAIT_ERP_CONFIRMATION = "AwaitErpConfirmation";
     public static final String NOTIFY = "NotifyRequester";
-    public static final String CHECK_COST_CENTER = "CheckCostCenter";
     public static final String RESERVE_BUDGET = "ReserveBudget";
     public static final String SEND_PURCHASE_ORDER = "SendPurchaseOrder";
     public static final String COMPENSATING = "Compensating";

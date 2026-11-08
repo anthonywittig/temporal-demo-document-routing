@@ -108,7 +108,7 @@ class DocumentActivitiesTest {
 
   @Test
   void unknownCostCenterFailsWithoutRetry() {
-    var e = assertThrows(ActivityFailure.class, () -> activities.checkCostCenter(BAD_CC));
+    var e = assertThrows(ActivityFailure.class, () -> activities.reserveBudget(BAD_CC));
     var cause = (ApplicationFailure) e.getCause();
     assertEquals(HttpCalls.REJECTED, cause.getType());
     assertTrue(cause.isNonRetryable());

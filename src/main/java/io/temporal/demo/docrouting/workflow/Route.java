@@ -12,7 +12,7 @@ public enum Route {
   HUMAN_REVIEW("HumanReview"),
   /** The invoice is posted to the ERP, which confirms asynchronously, then the requester is notified. */
   INVOICE("Invoice"),
-  /** Cost-center check, budget reservation, then the purchase order is sent to the supplier portal. */
+  /** Budget is reserved against the cost center, then the purchase order is sent to the supplier portal. */
   PURCHASE_ORDER("PurchaseOrder");
 
   private final String value;
