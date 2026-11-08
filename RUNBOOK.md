@@ -146,7 +146,15 @@ Thirty-second version: "A document comes in, is classified, and business-unit ru
 3. Open one. The failure says `POST /tasks/reserve-budget returned HTTP 422: Budget: unknown cost center CC-99`. Point out that `ReserveBudget` ran once: a 422 is never retried. And there's no `ReleaseBudget`: nothing was reserved, so there's nothing to undo.
 4. Say: "This is where a dead-letter queue would come in. Here, the failed request is the record: input, error, and where it stopped, searchable alongside everything else. And nothing else was blocked behind it."
 5. Fix the data. In `data/reference-data.json`, add `"CC-99"` to `costCenters` and save. Nothing needs restarting.
-6. In the third terminal, replay every request that failed this way:
+6. In the third terminal, list what the replay will touch before running it. This is the same query the reset will use:
+
+   ```sh
+   temporal workflow list --disable-config-file \
+     --query 'ExecutionStatus="Failed" AND Step="ReserveBudget"'
+   ```
+
+   It lists the three CC-99 documents, each with status `Failed`. Say: "Before changing anything in bulk, run the query on its own. Whatever it lists is exactly what the reset will act on, nothing more."
+7. Replay every request that failed this way:
 
    ```sh
    temporal workflow reset --disable-config-file \
@@ -154,10 +162,10 @@ Thirty-second version: "A document comes in, is classified, and business-unit ru
      --type FirstWorkflowTask --reason "CC-99 added to the cost-center reference data" --yes
    ```
 
-7. Within about 15 seconds, the three documents show **Completed** in **Recent requests**.
-8. Open one in the Temporal UI. The new run starts with a reset event carrying your reason and links back to the original run. Point at the **Reset** button on a workflow page: that's the same replay for a single request.
-9. Say: "One query found everything that failed for this reason, and one command replayed all of it, with the reason on record. The original failed runs stay as the audit trail; the fix is a new run linked to each one. That's diagnosis, correction, replay and audit, without a separate queue to run."
-10. If someone notices that **Failed at budget reservation** still lists three runs: those are the original runs, kept on purpose. Their documents now each have a newer, completed run.
+8. Within about 15 seconds, the three documents show **Completed** in **Recent requests**.
+9. Open one in the Temporal UI. The new run starts with a reset event carrying your reason and links back to the original run. Point at the **Reset** button on a workflow page: that's the same replay for a single request.
+10. Say: "One query found everything that failed for this reason, and one command replayed all of it, with the reason on record. The original failed runs stay as the audit trail; the fix is a new run linked to each one. That's diagnosis, correction, replay and audit, without a separate queue to run."
+11. If someone notices that **Failed at budget reservation** still lists three runs: those are the original runs, kept on purpose. Their documents now each have a newer, completed run.
 
 ### 7. Ship v2 while v1 requests are still open
 
@@ -315,7 +323,7 @@ WorkerDeploymentOptions.newBuilder()
 - **Correcting data inside a running request isn't shown.** Here the fix is in the cost-center reference data, followed by a replay. A workflow can also accept corrected data through an Update.
 - **Scale isn't shown.** One local dev server and one worker. Thousands of requests a day are small for Temporal Cloud.
 - **No circuit breaker.** Bounded retries with backoff and timeouts are shown. A breaker that stops calling a failing system for a while lives in the Activity or a shared client, not in Temporal.
-- **No bulk-change preview.** Before a batch operation, the same visibility query shows exactly which requests it will touch (beat 6, step 2). There's no separate dry-run screen.
+- **No bulk-change preview.** Before a batch operation, the same visibility query shows exactly which requests it will touch (beat 6, steps 2 and 6). There's no separate dry-run screen.
 - **One environment only.** Dev, test and production are separate Namespaces (or Temporal Cloud accounts). Promotion is your CI/CD deploying the same build through each one, with Worker Versioning in each.
 - **Data residency, retention and deletion aren't shown.** Temporal Cloud runs in a region you choose (including EU regions for GDPR). Each Namespace has a retention period after which closed workflow histories are deleted, and payload encryption keeps document data unreadable to the service.
 - **BPMN isn't produced.** The Temporal UI's timeline and the `Step` attribute are the "where am I" view. The workflow code, not a diagram, is the executable definition.
@@ -341,7 +349,7 @@ WorkerDeploymentOptions.newBuilder()
 | Rules badge is amber and a banner says the edit was rejected | `data/rules.json` doesn't parse or validate | Fix the file, or save from the **Routing rules** card, which writes a valid file; the banner names the problem. The last good version stays in force meanwhile |
 | After `make worker BUILD_ID=v2`, new requests still show **v1** | v2 isn't current yet | `make promote BUILD_ID=v2` |
 | **Failed at budget reservation** still lists runs after the reset | Expected: those are the original failed runs, kept as the record | Each document has a newer completed run; open one to show the link |
-| The batch reset command matches nothing | CC-99 requests haven't failed yet, or you already reset them | Wait for **Failed**, or check the query in the Temporal UI first |
+| The batch reset command matches nothing | CC-99 requests haven't failed yet, or you already reset them | Wait for **Failed**, or run the `temporal workflow list` query from beat 6 first |
 | `make` fails with "release version 21 not supported" | Maven is running an older JDK | Put JDK 21 or later first on your `PATH`; the Makefile uses that JDK |
 
 ## Keeping this runbook current
