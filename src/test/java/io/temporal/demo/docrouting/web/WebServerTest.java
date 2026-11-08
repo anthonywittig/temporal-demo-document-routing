@@ -8,6 +8,7 @@ import io.temporal.api.enums.v1.IndexedValueType;
 import io.temporal.client.WorkflowStub;
 import io.temporal.demo.docrouting.Config;
 import io.temporal.demo.docrouting.rules.RulesLoader;
+import io.temporal.demo.docrouting.workflow.DocumentRequest;
 import io.temporal.demo.docrouting.workflow.DocumentRequestWorkflow;
 import io.temporal.demo.docrouting.workflow.DocumentRequestWorkflowImpl;
 import io.temporal.demo.docrouting.workflow.FakeActivities;
@@ -73,18 +74,17 @@ class WebServerTest {
   }
 
   @Test
-  void duplicateSubmissionStartsNothingNew() throws Exception {
-    var first = call("POST", "/api/submit", "{\"scenario\":\"services-invoice-3000\"}");
-    assertEquals(200, first.statusCode(), first.body());
-    JsonNode started = JSON.readTree(first.body()).get("results").get(0);
-    String workflowId = started.get("workflowId").asText();
+  void sameDocumentTwiceStartsNothingNew() throws Exception {
+    // Not on the page any more, but still the guarantee: the Workflow ID is the document ID.
+    DocumentRequest doc = Scenarios.find("services-invoice-3000").document("DUP1");
+    Map<String, Object> first = web.start(doc);
+    assertEquals(false, first.get("duplicate"));
+    String workflowId = (String) first.get("workflowId");
     String runId = env.getWorkflowClient().newUntypedWorkflowStub(workflowId).describe().getExecution().getRunId();
 
-    var dup = call("POST", "/api/submit", "{\"scenario\":\"duplicate\"}");
-    assertEquals(409, dup.statusCode(), dup.body());
-    JsonNode refused = JSON.readTree(dup.body()).get("results").get(0);
-    assertTrue(refused.get("duplicate").asBoolean());
-    assertEquals(workflowId, refused.get("workflowId").asText());
+    Map<String, Object> refused = web.start(doc);
+    assertEquals(true, refused.get("duplicate"));
+    assertEquals(workflowId, refused.get("workflowId"));
 
     String runIdAfter = env.getWorkflowClient().newUntypedWorkflowStub(workflowId).describe().getExecution().getRunId();
     assertEquals(runId, runIdAfter, "no new execution may start for a duplicate");
