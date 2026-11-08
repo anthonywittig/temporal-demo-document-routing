@@ -2,8 +2,8 @@ package io.temporal.demo.docrouting.rules;
 
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import io.temporal.demo.docrouting.workflow.Route;
-import io.temporal.demo.docrouting.workflow.RoutingDecision;
+import io.temporal.demo.docrouting.model.Route;
+import io.temporal.demo.docrouting.model.RoutingDecision;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;

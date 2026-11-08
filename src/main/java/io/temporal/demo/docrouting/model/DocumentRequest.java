@@ -1,4 +1,4 @@
-package io.temporal.demo.docrouting.workflow;
+package io.temporal.demo.docrouting.model;
 
 /** A received document. {@code cost} is in whole dollars. */
 public record DocumentRequest(
