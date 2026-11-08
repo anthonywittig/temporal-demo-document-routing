@@ -1,4 +1,4 @@
-package io.temporal.demo.docrouting.workflow;
+package io.temporal.demo.docrouting.model;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonValue;

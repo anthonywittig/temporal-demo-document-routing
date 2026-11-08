@@ -2,11 +2,9 @@ package io.temporal.demo.docrouting.activities;
 
 import io.temporal.activity.Activity;
 import io.temporal.activity.ActivityInfo;
+import io.temporal.demo.docrouting.model.DocumentRequest;
+import io.temporal.demo.docrouting.model.RoutingDecision;
 import io.temporal.demo.docrouting.rules.RulesLoader;
-import io.temporal.demo.docrouting.workflow.DocumentRequest;
-import io.temporal.demo.docrouting.workflow.EvaluateRulesInput;
-import io.temporal.demo.docrouting.workflow.NotifyRequesterInput;
-import io.temporal.demo.docrouting.workflow.RoutingDecision;
 import io.temporal.failure.ApplicationFailure;
 import java.time.Duration;
 import java.util.LinkedHashMap;

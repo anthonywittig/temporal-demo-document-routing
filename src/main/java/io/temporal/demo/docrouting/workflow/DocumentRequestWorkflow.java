@@ -1,5 +1,10 @@
 package io.temporal.demo.docrouting.workflow;
 
+import io.temporal.demo.docrouting.model.DocumentRequest;
+import io.temporal.demo.docrouting.model.ErpConfirmation;
+import io.temporal.demo.docrouting.model.RequestOutcome;
+import io.temporal.demo.docrouting.model.ReviewDecision;
+import io.temporal.demo.docrouting.model.ReviewResult;
 import io.temporal.workflow.SignalMethod;
 import io.temporal.workflow.UpdateMethod;
 import io.temporal.workflow.UpdateValidatorMethod;

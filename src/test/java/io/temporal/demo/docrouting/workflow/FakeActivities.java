@@ -2,7 +2,12 @@ package io.temporal.demo.docrouting.workflow;
 
 import io.temporal.activity.Activity;
 import io.temporal.demo.docrouting.activities.DocumentActivities;
+import io.temporal.demo.docrouting.activities.EvaluateRulesInput;
 import io.temporal.demo.docrouting.activities.HttpCalls;
+import io.temporal.demo.docrouting.activities.NotifyRequesterInput;
+import io.temporal.demo.docrouting.model.DocumentRequest;
+import io.temporal.demo.docrouting.model.Route;
+import io.temporal.demo.docrouting.model.RoutingDecision;
 import io.temporal.failure.ApplicationFailure;
 import java.util.ArrayDeque;
 import java.util.Collections;
