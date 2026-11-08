@@ -228,7 +228,7 @@ static String workflowId(String documentId) { return "doc-" + documentId; }
 } catch (WorkflowExecutionAlreadyStarted e) { /* duplicate: nothing new starts */ }
 ```
 
-Every side-effecting call also sends `Idempotency-Key: <workflowId>/<activity type>` ([`DocumentActivitiesImpl.java` line 96](src/main/java/io/temporal/demo/docrouting/activities/DocumentActivitiesImpl.java#L96)). The key is the same across retries and resets.
+Every side-effecting call also sends `Idempotency-Key: <workflowId>/<activity type>` ([`DocumentActivitiesImpl.java` line 94](src/main/java/io/temporal/demo/docrouting/activities/DocumentActivitiesImpl.java#L94)). The key is the same across retries and resets.
 
 ### Routing runs in an Activity, and the decision is recorded
 
