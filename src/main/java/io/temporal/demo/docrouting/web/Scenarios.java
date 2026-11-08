@@ -14,9 +14,6 @@ public final class Scenarios {
     }
   }
 
-  /** Resubmits the most recent document ID. */
-  public static final String DUPLICATE = "duplicate";
-
   public static final List<Scenario> ALL = List.of(
       new Scenario("services-invoice-3000", "Services · invoice · $3,000", "Posted to the ERP", "Services", "invoice", 3000, "CC-10", 1),
       new Scenario("equipment-invoice-3000", "Equipment · invoice · $3,000", "Same cost, Equipment: human task", "Equipment", "invoice", 3000, "CC-20", 1),
