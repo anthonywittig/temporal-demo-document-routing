@@ -77,7 +77,6 @@ function renderScenarios() {
     el("button", { class: "chip", "data-scenario": s.id, onclick: () => submit(s.id) },
       el("span", { class: "chip-label" }, s.label),
       el("span", { class: "chip-hint" }, s.hint))));
-  document.querySelector('[data-scenario="duplicate"]').addEventListener("click", () => submit("duplicate"));
 }
 
 // ---- inbox ----------------------------------------------------------------------------------
