@@ -167,7 +167,7 @@ Thirty-second version: "A document comes in, is classified, and business-unit ru
 9. Open one in the Temporal UI. The new run starts with a reset event carrying your reason and links back to the original run. Point at the **Reset** button on a workflow page: that's the same replay for a single request.
 10. Say: "One query found everything that failed for this reason, and one command replayed all of it, with the reason on record. The original failed runs stay as the audit trail; the fix is a new run linked to each one. That's diagnosis, correction, replay and audit, without a separate queue to run."
 11. If someone notices that **Failed at budget reservation** still lists three runs: those are the original runs, kept on purpose. Their documents now each have a newer, completed run.
-12. Don't run the step 7 command a second time. The original failed runs still match its query, so a second run replays those documents again: each one reserves budget and sends its purchase order twice.
+12. Don't run the step 7 command a second time. The original failed runs still match its query, so each document gets another run. Here the idempotency keys stop a second reservation or purchase order: the budget service and the supplier portal see the same key and return their first answer. Not every system you call is that careful, so replay only what you mean to (step 13).
 13. Optional, to replay only some documents. A visibility query can't say "skip documents that already have a completed run", so name them yourself. A document's workflow ID is `doc-` followed by its document ID. To list the failed runs except those of documents already replayed:
 
     ```sh
@@ -368,7 +368,7 @@ WorkerDeploymentOptions.newBuilder()
 | After `make worker BUILD_ID=v2`, new requests still show **v1** | v2 isn't current yet | `make promote BUILD_ID=v2` |
 | **Failed at budget reservation** still lists runs after the reset | Expected: those are the original failed runs, kept as the record | Each document has a newer completed run; open one to show the link |
 | The batch reset command matches nothing | CC-99 requests haven't failed yet | Wait for **Failed**, or run the `temporal workflow list` query from beat 6 first |
-| A CC-99 document has two completed runs after beat 6 | The reset command ran twice. The original failed runs still match its query, so the second run replayed them again | Nothing to clean up in the demo. Next time, replay only documents that haven't completed: filter by workflow ID as in beat 6, step 13 |
+| A CC-99 document has two completed runs after beat 6 | The reset command ran twice. The original failed runs still match its query, so the second run replayed them again. The idempotency keys kept it to one reservation and one purchase order per document | Nothing to clean up in the demo. Next time, replay only documents that haven't completed: filter by workflow ID as in beat 6, step 13 |
 | `make` fails with "release version 21 not supported" | Maven is running an older JDK | Put JDK 21 or later first on your `PATH`; the Makefile uses that JDK |
 
 ## Keeping this runbook current
