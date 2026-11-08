@@ -2,7 +2,7 @@ package io.temporal.demo.docrouting.rules;
 
 import static org.junit.jupiter.api.Assertions.*;
 
-import io.temporal.demo.docrouting.workflow.Route;
+import io.temporal.demo.docrouting.model.Route;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;

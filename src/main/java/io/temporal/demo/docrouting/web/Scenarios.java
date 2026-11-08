@@ -1,6 +1,6 @@
 package io.temporal.demo.docrouting.web;
 
-import io.temporal.demo.docrouting.workflow.DocumentRequest;
+import io.temporal.demo.docrouting.model.DocumentRequest;
 import java.util.List;
 
 /** The one-click documents on the demo page. */
