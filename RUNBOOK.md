@@ -21,13 +21,13 @@ During the talk you change the rules live, stop the worker and the external syst
 
 The demo makes five problems visible:
 
-- **Routing rules change more often than code.** Rules live in a JSON file outside the workflow. A change takes effect on the next request with no deploy, and each decision records the rules version that made it. Beats 3 and 4.
-- **People take time, and their decisions change the route.** The human task waits durably, with an SLA. A rejection ends the request; an approval re-evaluates it against the rules in force at that moment, with the cost check the reviewer just signed off waived. Beat 4.
-- **External systems fail, slowly or for good.** Outages are retried with backoff. Rejections are not retried, and completed steps are undone in reverse. Beats 5 and 6.
-- **Bad data needs a fix and a replay, not a dead-letter queue.** Failed requests stay where they failed, searchable, and are replayed in bulk after the data is fixed. Beat 7.
-- **Shipping new code can't break requests in flight.** Each request is pinned to the worker version it started on, and old versions drain. Beat 8.
+- **Routing rules change more often than code.** Rules live in a JSON file outside the workflow. A change takes effect on the next request with no deploy, and each decision records the rules version that made it. Beats 2 and 3.
+- **People take time, and their decisions change the route.** The human task waits durably, with an SLA. A rejection ends the request; an approval re-evaluates it against the rules in force at that moment, and counts only if they still want a review. Beat 3.
+- **External systems fail, slowly or for good.** Outages are retried with backoff. Rejections are not retried, and completed steps are undone in reverse. Beats 4 and 5.
+- **Bad data needs a fix and a replay, not a dead-letter queue.** Failed requests stay where they failed, searchable, and are replayed in bulk after the data is fixed. Beat 6.
+- **Shipping new code can't break requests in flight.** Each request is pinned to the worker version it started on, and old versions drain. Beat 7.
 
-Beat 9 pulls it together in the Temporal UI: how many requests are at each step, which are past SLA, and where any one of them is.
+Beat 8 pulls it together in the Temporal UI: how many requests are at each step, which are past SLA, and where any one of them is.
 
 ## Before you start
 
@@ -35,7 +35,7 @@ You need JDK 21 or later on your `PATH`, Maven 3.9 or later, and Temporal CLI 1.
 
 Run `make test` once on the machine you'll present from. The first run downloads dependencies.
 
-Have three terminals open in `temporal-demo-document-routing/`, plus a browser with two tabs, and an editor with `data/reference-data.json` open for beat 7. (`make up` creates the `data/` files on its first run.) Open `data/rules.json` as well if you'd rather show beat 3 as a file edit.
+Have three terminals open in `temporal-demo-document-routing/`, plus a browser with two tabs, and an editor with `data/reference-data.json` open for beat 6. (`make up` creates the `data/` files on its first run.) Open `data/rules.json` as well if you'd rather show beat 2 as a file edit.
 
 If the page doesn't show **rules v1** when you start, an earlier rehearsal left its edits behind: click **Reset demo data** in the **Routing rules** card.
 
@@ -49,15 +49,15 @@ In two terminals:
 
 1. `make up`: starts three processes in this terminal, and `Ctrl-C` stops all three:
    - the Temporal dev server, with UI at http://localhost:8233. It registers the `Step`, `Path`, `BusinessUnit`, `SlaBreached` and `RulesVersion` search attributes;
-   - the mock external systems on :8090. Beat 5's optional harder outage stops and starts these;
+   - the mock external systems on :8090. Beat 4's optional harder outage stops and starts these;
    - the demo app at http://localhost:8080.
-2. `make worker`: worker version `v1`. You stop and start this one in beat 5. On a fresh dev server it logs `had no current version; made v1 current`. Start it once the dev server is up.
+2. `make worker`: worker version `v1`. You stop and start this one in beat 4. On a fresh dev server it logs `had no current version; made v1 current`. Start it once the dev server is up.
 
-Keep a third terminal free for beat 7's reset command and beat 8's second worker. If you'll show beat 5's optional harder outage, keep a fourth for it.
+Keep a third terminal free for beat 6's reset command and beat 7's second worker. If you'll show beat 4's optional harder outage, keep a fourth for it.
 
 A healthy start shows the following on http://localhost:8080:
 - the top bar shows **rules v1** and `task queue · document-routing`;
-- five document chips, plus **Resubmit last document**;
+- five document chips;
 - the **Routing rules** card shows **v1**, with Services at 5000 and Equipment at 1000;
 - **ERP is up** and **Supplier portal accepts purchase orders**;
 - an empty **Reviewer inbox** ("No open tasks.") and an empty **Recent requests** list.
@@ -73,15 +73,14 @@ Thirty-second version: "A document comes in, is classified, and business-unit ru
 | Beat | Minutes | Compress if short on time |
 |---|---|---|
 | 1. A document is posted to the ERP | 6 | |
-| 2. The same document, twice | 3 | yes, fold into beat 1 |
-| 3. Same cost, different unit; change a rule live | 10 | |
-| 4. A person approves it; the SLA runs out | 10 | |
-| 5. Take the ERP and the worker away | 8 | |
-| 6. The supplier says no; the budget is released | 7 | |
-| 7. Bad data: find, fix, replay in bulk | 10 | |
-| 8. Ship v2 while v1 requests are still open | 10 | |
-| 9. The operations view | 7 | yes, show only two filters |
-| **Total** | **71** | leaves about 17 minutes for questions |
+| 2. Same cost, different unit; change a rule live | 10 | |
+| 3. A person approves it; the SLA runs out | 10 | |
+| 4. Take the ERP and the worker away | 8 | |
+| 5. The supplier says no; the budget is released | 7 | |
+| 6. Bad data: find, fix, replay in bulk | 10 | |
+| 7. Ship v2 while v1 requests are still open | 10 | |
+| 8. The operations view | 7 | yes, show only two filters |
+| **Total** | **68** | leaves about 20 minutes for questions |
 
 ### 1. A document is posted to the ERP
 
@@ -96,14 +95,9 @@ Thirty-second version: "A document comes in, is classified, and business-unit ru
    - `NotifyRequester`.
 4. Say: "The ERP took the invoice and confirmed the posting later, on its own schedule. That callback came in as a Signal. Temporal recorded it in the history, and the workflow carried on to notify the requester. The synchronous call and the asynchronous confirmation are both just steps in one durable function."
 
-### 2. The same document, twice
+### 2. Same cost, different unit; change a rule live
 
-1. Click **Resubmit last document**. A toast says "Document D… is already being processed or was processed; nothing new started".
-2. Say: "The Workflow ID is the document ID, so Temporal refuses a second start. The same idea applies on every external call. Each one carries an idempotency key made from the Workflow ID, so a retry never creates a second ERP posting or a second notification."
-
-### 3. Same cost, different unit; change a rule live
-
-1. Click **Equipment · invoice · $3,000**. It appears in the **Reviewer inbox** with the reason "Equipment: cost 3000 is above the human-review threshold 1000", rules **v1**, and an SLA countdown. **Leave it there**: it's the in-flight request for this beat and beat 4.
+1. Click **Equipment · invoice · $3,000**. It appears in the **Reviewer inbox** with the reason "Equipment: cost 3000 is above the human-review threshold 1000", rules **v1**, and an SLA countdown. **Leave it there**: it's the in-flight request for this beat and beat 3.
 2. Say: "Same cost as the Services invoice, different business unit, different path. Each business unit has its own threshold. It comes from rules held outside the workflow, which stand in for Drools or any rules engine."
 3. In the **Routing rules** card, change Equipment to `5000` and click **Save as v2**. A toast says "Saved rules v2: the next evaluation uses them", and the card and the top bar show **rules v2**. (The card writes `data/rules.json`. Editing that file by hand does the same thing: set `"version": 2` and the Equipment `"humanReviewAbove"` to `5000`, and save.)
 4. Click **Equipment · invoice · $3,000** again. This time it goes straight to path **Invoice** and completes, with rules **v2** on its row.
@@ -111,19 +105,19 @@ Thirty-second version: "A document comes in, is classified, and business-unit ru
 6. Say: "No deploy. The rules live outside the workflow, in a file this card writes, standing in for your rules engine and its admin screen. The next evaluation read the new version. The request already in flight keeps the decision it made, because that decision and its rules version are in its history. It won't silently change route under someone."
 7. Optional, to show validation: in the card, type `-5` for a threshold and save. The toast refuses it ("must not be negative"), and the version doesn't change. A broken hand edit to `data/rules.json` (delete a closing brace) is rejected too: the rules badge turns amber, and a banner says "rules.json edit rejected; still using v2". Rollback is the same move as a change: save the previous threshold, which becomes the next version.
 
-### 4. A person approves it; the SLA runs out
+### 3. A person approves it; the SLA runs out
 
-1. In the inbox, on the Equipment request from beat 3, type a comment and click **Approve**. A toast says "Approved by Sam Chen: recorded by Temporal".
+1. In the inbox, on the Equipment request from beat 2, type a comment and click **Approve**. A toast says "Approved by Sam Chen: recorded by Temporal".
 2. The request goes back through the rules in force now, **v2**, carrying the approval. Under v2 the cost is within Equipment's new threshold, so the rules don't need a review any more and route it to `Invoice` on their own; it completes. Open it in the Temporal UI: there are two `EvaluateRules` results, v1 → `HumanReview` ("cost 3000 is above the human-review threshold 1000") and then v2 → `Invoice` ("cost 3000 is within 5000"), with the Update `Review` between them carrying the reviewer and the comment. Had v2 still put the cost above the threshold, the approval would have stood in for that review, and the reason would read "cost 3000 is above …, approved by a reviewer".
 3. Say: "Approval is a loop in code, not a special feature. The request re-runs the rules in force now. The approval only matters if those rules still want a person to look; if they don't, the new rules route it. It arrived under v1, and its second decision was made by v2. Whoever opens the history sees both decisions, which rules made each one, and who made the call in between."
 4. Click **Services · invoice · $12,000**. It lands in the inbox (above the Services threshold of 5000). Click **Waiting on a person** under **Temporal UI views** to show the same list in the Temporal UI.
 5. Let the SLA run out while you talk (60 seconds by default). The row turns red with **SLA breached**. In the Temporal UI, **SLA breached** lists it, and the request's timeline shows the fired `ReviewSla` (1m) timer.
 6. Say: "The SLA is a durable timer. Breaching it flags the request; it doesn't cancel it. A late decision still counts. In production the flag is what you alert on."
-7. **Don't approve or reject this one.** It's the open v1 request for beat 8.
+7. **Don't approve or reject this one.** It's the open v1 request for beat 7.
 8. Optional, for a stale click: if anyone asks about double-clicks, act on a task twice. The second click says "Task … is no longer open". The Update's validator rejected it, and nothing was written to history.
 9. Optional, for the other answer: click **Services · invoice · $12,000** again and **Reject** the new task (not the breached one). Its row in **Recent requests** reads **Rejected**, at step **Rejected**. In its history, the Update `Review` is followed only by `NotifyRequester`: no ERP posting, no archive.
 
-### 5. Take the ERP and the worker away
+### 4. Take the ERP and the worker away
 
 1. Tick **ERP is up**. It now reads **ERP is DOWN (503)**.
 2. Click **Services · invoice · $3,000**. The row stays at step **PostToErp**, status **Running**.
@@ -135,7 +129,7 @@ Thirty-second version: "A document comes in, is classified, and business-unit ru
 8. Say: "Both the ERP and the worker went away mid-request. When they came back, the request picked up at the step it was on. It posted to the ERP once and notified once. The retry state, the timer and the progress all lived in Temporal, not in the process we killed."
 9. Optional, for a harder outage: instead of the toggle in step 1, run `make stop-systems` in the fourth terminal. Every mock system goes away, the **External systems** card turns red ("Systems process unreachable"), and the last failure reads "Connection refused". In step 6, run `make systems` in that terminal instead of unticking. It keeps running there for the rest of the demo. The retry behavior is the same.
 
-### 6. The supplier says no; the budget is released
+### 5. The supplier says no; the budget is released
 
 1. Tick **Supplier portal accepts purchase orders**. It now reads **Supplier portal REJECTS purchase orders**.
 2. Click **Equipment · purchase order · $800**. It goes down `PurchaseOrder`, and the row ends at step **Rejected**.
@@ -147,7 +141,7 @@ Thirty-second version: "A document comes in, is classified, and business-unit ru
 4. Say: "The supplier portal rejected the purchase order, so retrying is pointless. The workflow undoes what it already did: it releases the budget it reserved. The request completes as a business rejection, not a crash. Each step registers its undo as it succeeds, so with more steps they'd all be undone, in reverse order."
 5. Untick the toggle.
 
-### 7. Bad data: find, fix, replay in bulk
+### 6. Bad data: find, fix, replay in bulk
 
 1. Click **3 × cost center CC-99**. Three requests start and almost at once show status **Failed**, at step **CheckCostCenter**.
 2. Click **Failed at the cost-center check** under **Temporal UI views**. The Temporal UI lists all three.
@@ -167,9 +161,9 @@ Thirty-second version: "A document comes in, is classified, and business-unit ru
 9. Say: "One query found everything that failed for this reason, and one command replayed all of it, with the reason on record. The original failed runs stay as the audit trail; the fix is a new run linked to each one. That's diagnosis, correction, replay and audit, without a separate queue to run."
 10. If someone notices that **Failed at the cost-center check** still lists three runs: those are the original runs, kept on purpose. Their documents now each have a newer, completed run.
 
-### 8. Ship v2 while v1 requests are still open
+### 7. Ship v2 while v1 requests are still open
 
-The Services $12,000 request from beat 4 should still be open in the inbox, on v1.
+The Services $12,000 request from beat 3 should still be open in the inbox, on v1.
 
 1. In the third terminal: `make worker BUILD_ID=v2`. It starts polling. v1 is still current, so new requests still go to v1.
 2. `make promote BUILD_ID=v2`. It prints "Successfully set the current worker deployment version".
@@ -185,7 +179,7 @@ The Services $12,000 request from beat 4 should still be open in the inbox, on v
    v1 shows `draining`, and after a few minutes `drained`. Then `Ctrl-C` the v1 worker.
 7. Say: "Here we waited for v1 to drain. If a v1 request were going to wait for weeks, you can also move it onto the new version, as long as the new code is written to replay the old history. That's a decision per change, not a platform limitation."
 
-### 9. The operations view
+### 8. The operations view
 
 1. In the Temporal UI, use the links from the page:
    - **Waiting on a person**: the count at the top answers "how many requests are at this step";
@@ -200,7 +194,7 @@ Links are relative to this directory and point at line ranges. They are not pinn
 
 ### One execution per document
 
-[`DocumentRequestWorkflow.java` lines 16–18](src/main/java/io/temporal/demo/docrouting/workflow/DocumentRequestWorkflow.java#L16-L18) and [`WebServer.java` lines 149 and 169](src/main/java/io/temporal/demo/docrouting/web/WebServer.java#L145-L174):
+[`DocumentRequestWorkflow.java` lines 16–18](src/main/java/io/temporal/demo/docrouting/workflow/DocumentRequestWorkflow.java#L16-L18) and [`WebServer.java` lines 137 and 157](src/main/java/io/temporal/demo/docrouting/web/WebServer.java#L133-L162):
 
 ```java
 static String workflowId(String documentId) { return "doc-" + documentId; }
@@ -256,7 +250,7 @@ sla.cancel();
 
 ### Turn a callback into a Signal
 
-The web app receives the ERP's confirmation callback and signals the workflow ([`WebServer.java` lines 224–240](src/main/java/io/temporal/demo/docrouting/web/WebServer.java#L224-L240)). The workflow waits with a deadline ([`DocumentRequestWorkflowImpl.java` lines 159–170](src/main/java/io/temporal/demo/docrouting/workflow/DocumentRequestWorkflowImpl.java#L159-L170)):
+The web app receives the ERP's confirmation callback and signals the workflow ([`WebServer.java` lines 212–228](src/main/java/io/temporal/demo/docrouting/web/WebServer.java#L212-L228)). The workflow waits with a deadline ([`DocumentRequestWorkflowImpl.java` lines 159–170](src/main/java/io/temporal/demo/docrouting/workflow/DocumentRequestWorkflowImpl.java#L159-L170)):
 
 ```java
 // a named timer, so the Temporal UI shows "WaitForErpConfirmation (2m)"
@@ -288,7 +282,7 @@ catch (ActivityFailure e) { saga.compensate(); ... }
 
 ### Progress you can search, and an inbox that needs no worker
 
-The workflow keeps `Step` current at every step ([`DocumentRequestWorkflowImpl.java` line 241](src/main/java/io/temporal/demo/docrouting/workflow/DocumentRequestWorkflowImpl.java#L241-L243)), and puts the task details in its memo ([line 109](src/main/java/io/temporal/demo/docrouting/workflow/DocumentRequestWorkflowImpl.java#L105-L109)). The inbox is a visibility query, not a Query, so it works with no worker running ([`WebServer.java` lines 254–261](src/main/java/io/temporal/demo/docrouting/web/WebServer.java#L254-L261)):
+The workflow keeps `Step` current at every step ([`DocumentRequestWorkflowImpl.java` line 241](src/main/java/io/temporal/demo/docrouting/workflow/DocumentRequestWorkflowImpl.java#L241-L243)), and puts the task details in its memo ([line 109](src/main/java/io/temporal/demo/docrouting/workflow/DocumentRequestWorkflowImpl.java#L105-L109)). The inbox is a visibility query, not a Query, so it works with no worker running ([`WebServer.java` lines 242–249](src/main/java/io/temporal/demo/docrouting/web/WebServer.java#L242-L249)):
 
 ```java
 client.listExecutions("WorkflowType=\"DocumentRequestWorkflow\" AND ExecutionStatus=\"Running\" AND Step=\"HumanTask\"")
@@ -309,6 +303,7 @@ WorkerDeploymentOptions.newBuilder()
 
 ### What's demo-only
 
+- **Duplicate submissions aren't shown on screen.** If it comes up: the Workflow ID is the document ID, so Temporal refuses a second start for the same document, and every external call carries an idempotency key made from the Workflow ID, so a retry never posts to the ERP or notifies twice. Beat 4 shows the second part (one posting, one notification after the outage). Code: [One execution per document](#one-execution-per-document).
 - **v2 is a flag, not a new build.** [`WorkerMain.settingsFor`](src/main/java/io/temporal/demo/docrouting/worker/WorkerMain.java#L69-L72) turns on the archive step for any Build ID other than `v1`. In a real release, v2 would be new code built and deployed with its own Build ID.
 - **The rules engine is a JSON file.** It stands in for Drools or a decision-table service. The workflow calls it through one Activity, so swapping it is local to [`RulesLoader`](src/main/java/io/temporal/demo/docrouting/rules/RulesLoader.java). Scheduled activation isn't built.
 - **The external systems are one mock process,** with an in-memory idempotency store that forgets everything on restart. Real systems keep idempotency keys durably.
@@ -322,7 +317,7 @@ WorkerDeploymentOptions.newBuilder()
 - **Correcting data inside a running request isn't shown.** Here the fix is in the cost-center reference data, followed by a replay. A workflow can also accept corrected data through an Update.
 - **Scale isn't shown.** One local dev server and one worker. Thousands of requests a day are small for Temporal Cloud.
 - **No circuit breaker.** Bounded retries with backoff and timeouts are shown. A breaker that stops calling a failing system for a while lives in the Activity or a shared client, not in Temporal.
-- **No bulk-change preview.** Before a batch operation, the same visibility query shows exactly which requests it will touch (beat 7, step 2). There's no separate dry-run screen.
+- **No bulk-change preview.** Before a batch operation, the same visibility query shows exactly which requests it will touch (beat 6, step 2). There's no separate dry-run screen.
 - **One environment only.** Dev, test and production are separate Namespaces (or Temporal Cloud accounts). Promotion is your CI/CD deploying the same build through each one, with Worker Versioning in each.
 - **Data residency, retention and deletion aren't shown.** Temporal Cloud runs in a region you choose (including EU regions for GDPR). Each Namespace has a retention period after which closed workflow histories are deleted, and payload encryption keeps document data unreadable to the service.
 - **BPMN isn't produced.** The Temporal UI's timeline and the `Step` attribute are the "where am I" view. The workflow code, not a diagram, is the executable definition.
@@ -331,7 +326,7 @@ WorkerDeploymentOptions.newBuilder()
 
 - **Between rehearsals:** click **Reset demo data** (or run `make reset-data`), `Ctrl-C` every terminal, then start again from [Start it](#start-it). The dev server keeps everything in memory, so stopping `make up` clears every request and both worker versions, and the first `make worker` makes v1 current again.
 - **Without restarting Temporal:** **Reset demo data** in the **Routing rules** card restores rules v1, removes CC-99 from the reference data, and clears both system toggles, after a confirmation. `make reset-data` restores the two files from a terminal. Old requests stay listed; that's harmless.
-- **Before beat 8 in a rehearsal where v2 is already current:** restart `make up`. Otherwise new requests go straight to v2.
+- **Before beat 7 in a rehearsal where v2 is already current:** restart `make up`. Otherwise new requests go straight to v2.
 
 ## When something goes wrong
 
@@ -339,8 +334,8 @@ WorkerDeploymentOptions.newBuilder()
 |---|---|---|
 | Banner "Reconnecting to Temporal…" | The web app can't reach the dev server | Start `make up`, then refresh |
 | **External systems** card is red, "unreachable" | The systems process isn't running | `make systems` (or `make up` if nothing is running) |
-| A request shows **Failed** at step **PostToErp** (or another external step) | The external system was down longer than the retry bound, about 3 minutes (20 attempts) | Bring the system back (untick **ERP is DOWN**, or start `make systems`), then replay as in beat 7: `temporal workflow reset --disable-config-file --query 'ExecutionStatus="Failed" AND Step="PostToErp"' --type FirstWorkflowTask --reason "ERP back" --yes` |
-| An `Invoice` request sits at **PostToErp** with attempts climbing | The **ERP is DOWN (503)** toggle is still on, perhaps from beat 5 | Untick it; the next retry succeeds |
+| A request shows **Failed** at step **PostToErp** (or another external step) | The external system was down longer than the retry bound, about 3 minutes (20 attempts) | Bring the system back (untick **ERP is DOWN**, or start `make systems`), then replay as in beat 6: `temporal workflow reset --disable-config-file --query 'ExecutionStatus="Failed" AND Step="PostToErp"' --type FirstWorkflowTask --reason "ERP back" --yes` |
+| An `Invoice` request sits at **PostToErp** with attempts climbing | The **ERP is DOWN (503)** toggle is still on, perhaps from beat 4 | Untick it; the next retry succeeds |
 | A new request stays at step **Received** | No worker is running, or the deployment has no current version | `make worker`. If it's running, check `temporal worker deployment describe --name document-routing --disable-config-file` and `make promote BUILD_ID=v1` |
 | Toast "No worker has accepted the decision yet…" | The worker is stopped | Start `make worker`. The decision is applied when it starts; clicking again is safe |
 | An `Invoice` request sits at **AwaitErpConfirmation** | The ERP's callback can't reach the web app | Keep `make up` running; the ERP retries the callback. After `CALLBACK_TIMEOUT` (2 minutes) the request fails with "The ERP did not confirm the posting" |

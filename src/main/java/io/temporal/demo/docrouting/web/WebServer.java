@@ -58,7 +58,6 @@ public final class WebServer {
   private final RulesLoader rules;
   private final io.temporal.demo.docrouting.rules.RulesEditor rulesEditor;
   private final HttpClient http = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(1)).build();
-  private volatile DocumentRequest lastDocument;
   private Javalin app;
 
   public WebServer(Config config, WorkflowClient client, RulesLoader rules) {
@@ -116,24 +115,13 @@ public final class WebServer {
     String scenarioId = JSON.readTree(ctx.body()).path("scenario").asText();
     List<Map<String, Object>> results = new ArrayList<>();
 
-    if (Scenarios.DUPLICATE.equals(scenarioId)) {
-      if (lastDocument == null) {
-        ctx.status(400).json(Map.of("error", "Submit a document first, then resubmit it"));
-        return;
-      }
-      // The same document again: same document ID, so the same Workflow ID.
-      results.add(start(lastDocument));
-    } else {
-      Scenarios.Scenario scenario = Scenarios.find(scenarioId);
-      if (scenario == null) {
-        ctx.status(400).json(Map.of("error", "Unknown scenario " + scenarioId));
-        return;
-      }
-      for (int i = 0; i < scenario.count(); i++) {
-        DocumentRequest doc = scenario.document(newDocumentId());
-        results.add(start(doc));
-        lastDocument = doc;
-      }
+    Scenarios.Scenario scenario = Scenarios.find(scenarioId);
+    if (scenario == null) {
+      ctx.status(400).json(Map.of("error", "Unknown scenario " + scenarioId));
+      return;
+    }
+    for (int i = 0; i < scenario.count(); i++) {
+      results.add(start(scenario.document(newDocumentId())));
     }
     boolean anyDuplicate = results.stream().anyMatch(r -> Boolean.TRUE.equals(r.get("duplicate")));
     ctx.status(anyDuplicate ? 409 : 200).json(Map.of("results", results));
