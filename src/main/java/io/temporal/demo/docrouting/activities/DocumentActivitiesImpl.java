@@ -34,7 +34,7 @@ public class DocumentActivitiesImpl implements DocumentActivities {
 
   @Override
   public String classify(DocumentRequest doc) {
-    pause();
+    pause(); // to slow the demo down
     // A stand-in for a real classifier: the scenario carries its type.
     String type = doc.docType() == null || doc.docType().isBlank() ? "invoice" : doc.docType();
     return type.toLowerCase();
@@ -42,7 +42,7 @@ public class DocumentActivitiesImpl implements DocumentActivities {
 
   @Override
   public RoutingDecision evaluateRules(EvaluateRulesInput input) {
-    pause();
+    pause(); // to slow the demo down
     DocumentRequest doc = input.doc();
     try {
       return rules.evaluate(doc.businessUnit(), input.docType(), doc.cost(), input.costApproved());
@@ -89,7 +89,7 @@ public class DocumentActivitiesImpl implements DocumentActivities {
   }
 
   private com.fasterxml.jackson.databind.JsonNode post(String path, DocumentRequest doc, Map<String, Object> extra) {
-    pause();
+    pause(); // to slow the demo down
     ActivityInfo info = Activity.getExecutionContext().getInfo();
     Map<String, Object> body = new LinkedHashMap<>();
     body.put("workflowId", info.getWorkflowId());
