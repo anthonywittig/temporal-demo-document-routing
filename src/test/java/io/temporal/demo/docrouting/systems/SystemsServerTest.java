@@ -126,18 +126,22 @@ class SystemsServerTest {
   }
 
   @Test
-  void unknownCostCenterIs422UntilAddedToReferenceData() throws Exception {
-    var rejected = send("POST", "/cost-centers/check", "{\"costCenter\":\"CC-99\"}", null);
+  void reservingAgainstUnknownCostCenterIs422UntilAddedToReferenceData() throws Exception {
+    String body = "{\"workflowId\":\"doc-6\",\"costCenter\":\"CC-99\"}";
+    var rejected = send("POST", "/tasks/reserve-budget", body, "r6");
     assertEquals(422, rejected.statusCode());
     assertTrue(rejected.body().contains("CC-99"));
+    assertEquals(0, effects().size(), "a refused reservation reserves nothing");
 
+    // Same key, as after a reset: the refusal wasn't remembered, so the reservation goes through.
     Files.writeString(referenceData, "{\"costCenters\":[\"CC-10\",\"CC-99\"]}");
-    assertEquals(200, send("POST", "/cost-centers/check", "{\"costCenter\":\"CC-99\"}", null).statusCode());
+    assertEquals(200, send("POST", "/tasks/reserve-budget", body, "r6").statusCode());
+    assertEquals("Reserve budget", effects().get(0).get("action").asText());
   }
 
   @Test
   void supplierRejectsUnderToggleAndUndoIsRecorded() throws Exception {
-    assertEquals(200, send("POST", "/tasks/reserve-budget", "{\"workflowId\":\"doc-7\"}", "r7").statusCode());
+    assertEquals(200, send("POST", "/tasks/reserve-budget", "{\"workflowId\":\"doc-7\",\"costCenter\":\"CC-10\"}", "r7").statusCode());
     send("PUT", "/control", "{\"erpDown\":false,\"supplierRejects\":true}", null);
     assertEquals(422, send("POST", "/supplier-portal/purchase-orders", "{\"workflowId\":\"doc-7\"}", "c7").statusCode());
     assertEquals(200, send("POST", "/tasks/reserve-budget/undo", "{\"workflowId\":\"doc-7\"}", "u7").statusCode());

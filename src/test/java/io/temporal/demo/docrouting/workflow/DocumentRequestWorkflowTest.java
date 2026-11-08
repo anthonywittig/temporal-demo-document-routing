@@ -226,7 +226,7 @@ class DocumentRequestWorkflowTest {
     RequestOutcome outcome = result(wf);
     assertEquals(RequestOutcome.COMPLETED, outcome.status());
     assertEquals(Route.PURCHASE_ORDER, outcome.path());
-    assertEquals(List.of("Classify", "EvaluateRules", "EvaluateRules", "CheckCostCenter",
+    assertEquals(List.of("Classify", "EvaluateRules", "EvaluateRules",
         "ReserveBudget", "SendPurchaseOrder", "NotifyRequester"), fake.calls());
   }
 
@@ -274,7 +274,7 @@ class DocumentRequestWorkflowTest {
     fake.route(Route.PURCHASE_ORDER, 1);
     var wf = begin(doc("c1", "Equipment", "purchase-order", 800));
     assertEquals(RequestOutcome.COMPLETED, result(wf).status());
-    assertEquals(List.of("Classify", "EvaluateRules", "CheckCostCenter",
+    assertEquals(List.of("Classify", "EvaluateRules",
         "ReserveBudget", "SendPurchaseOrder", "NotifyRequester"), fake.calls());
   }
 
@@ -292,15 +292,17 @@ class DocumentRequestWorkflowTest {
   }
 
   @Test
-  void unknownCostCenterFailsTheRequestAtCheckCostCenter() {
+  void unknownCostCenterFailsTheRequestAtReserveBudgetWithNothingToUndo() {
     start(false);
     fake.route(Route.PURCHASE_ORDER, 1);
     fake.costCenterUnknown = true;
     var wf = begin(doc("c3", "Equipment", "purchase-order", 800));
     var e = assertThrows(WorkflowFailedException.class, () -> result(wf));
     assertTrue(e.getCause().getCause().getMessage().contains("unknown cost center"), e.getCause().getCause().getMessage());
-    assertEquals(Steps.CHECK_COST_CENTER, step(wf));
-    assertEquals(1, fake.calls().stream().filter("CheckCostCenter"::equals).count(), "422 must not be retried");
+    assertEquals(Steps.RESERVE_BUDGET, step(wf));
+    assertEquals(1, fake.calls().stream().filter("ReserveBudget"::equals).count(), "422 must not be retried");
+    assertFalse(fake.calls().contains("ReleaseBudget"), "nothing was reserved, so nothing is released");
+    assertFalse(fake.calls().contains("SendPurchaseOrder"));
   }
 
   // ---- versions --------------------------------------------------------------------------------

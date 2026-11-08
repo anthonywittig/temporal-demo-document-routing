@@ -29,9 +29,7 @@ public interface DocumentActivities {
   /** Every path: tell the requester the outcome. */
   void notifyRequester(NotifyRequesterInput input);
 
-  /** PurchaseOrder: check the cost center. Fails without retry if it is unknown. */
-  void checkCostCenter(DocumentRequest doc);
-
+  /** PurchaseOrder: reserve the cost against its cost center. Fails without retry if the cost center is unknown. */
   void reserveBudget(DocumentRequest doc);
 
   void releaseBudget(DocumentRequest doc);

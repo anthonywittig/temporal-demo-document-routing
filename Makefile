@@ -11,7 +11,7 @@
 # `make up` runs these, which also work on their own, one per terminal:
 #
 #   make temporal   # Temporal dev server, UI on http://localhost:8233
-#   make systems    # mock ERP, cost-center check, supplier portal + notifications on :8090
+#   make systems    # mock ERP, budget service, supplier portal + notifications on :8090
 #   make web        # the demo app on http://localhost:8080
 #
 # Maven runs on the `java` found on your PATH (JDK 21 or later), even if

@@ -64,11 +64,6 @@ public class DocumentActivitiesImpl implements DocumentActivities {
   }
 
   @Override
-  public void checkCostCenter(DocumentRequest doc) {
-    post("/cost-centers/check", doc, Map.of());
-  }
-
-  @Override
   public void reserveBudget(DocumentRequest doc) {
     post("/tasks/reserve-budget", doc, Map.of("detail", "$" + doc.cost() + " from " + doc.costCenter()));
   }
