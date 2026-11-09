@@ -30,11 +30,8 @@ import java.time.Instant;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.util.function.Supplier;
-import org.slf4j.Logger;
 
 public class DocumentRequestWorkflowImpl implements DocumentRequestWorkflow {
-  private static final Logger log = Workflow.getLogger(DocumentRequestWorkflowImpl.class);
-
   static final ActivityOptions ACTIVITY_OPTIONS =
       ActivityOptions.newBuilder()
           .setStartToCloseTimeout(Duration.ofSeconds(10))
@@ -49,8 +46,8 @@ public class DocumentRequestWorkflowImpl implements DocumentRequestWorkflow {
       Workflow.newActivityStub(DocumentActivities.class, ACTIVITY_OPTIONS);
 
   // The open human task. The first goes to the assignee the rules named; each assignment is a new
-  // task ID. Complete (an Update) is accepted and Reassign (a Signal) is acted on only for the open
-  // one, and the human-task loop acts on whichever arrives.
+  // task ID. Complete (an Update) is accepted only for the open one; Reassign (a Signal) is taken
+  // as sent. The human-task loop acts on whichever arrives.
   private String openTaskId;
   private String assignee;
   private boolean completed;
@@ -139,18 +136,8 @@ public class DocumentRequestWorkflowImpl implements DocumentRequestWorkflow {
 
   @Override
   public void reassign(ReassignTask action) {
-    // A Signal can't be refused: it's in the history before this runs. So a stale task or a blank
-    // name is ignored here. Throwing would fail the workflow task, not the Signal.
-    if (action == null || openTaskId == null || !openTaskId.equals(action.taskId())) {
-      log.info("Ignored Reassign for task {}; the open task is {}", action == null ? null : action.taskId(), openTaskId);
-      return;
-    }
-    if (action.assignee() == null || action.assignee().isBlank()) {
-      log.info("Ignored Reassign for task {}: no one named", action.taskId());
-      return;
-    }
     openTaskId = null;
-    reassignTo = action.assignee().trim();
+    reassignTo = action.assignee();
   }
 
   private void requireOpenTask(String taskId) {

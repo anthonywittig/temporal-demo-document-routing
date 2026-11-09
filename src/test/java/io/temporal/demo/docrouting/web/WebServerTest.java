@@ -129,9 +129,6 @@ class WebServerTest {
     assertEquals(12000L, awaitTask(workflowId, documentId + "-t1").get(SearchAttrs.COST));
 
     String t1 = "{\"workflowId\":\"" + workflowId + "\",\"taskId\":\"" + documentId + "-t1\"";
-    var blank = call("POST", "/api/tasks/reassign", t1 + ",\"assignee\":\"  \"}");
-    assertEquals(400, blank.statusCode(), blank.body());
-
     var reassigned = call("POST", "/api/tasks/reassign", t1 + ",\"assignee\":\"Bob\",\"comment\":\"over to you\"}");
     assertEquals(200, reassigned.statusCode(), reassigned.body());
     assertEquals("Reassign to Bob", JSON.readTree(reassigned.body()).get("message").asText());

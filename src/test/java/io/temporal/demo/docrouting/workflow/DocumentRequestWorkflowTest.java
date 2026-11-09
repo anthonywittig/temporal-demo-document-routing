@@ -197,11 +197,6 @@ class DocumentRequestWorkflowTest {
         .filter(ev -> ev.hasWorkflowExecutionUpdateAcceptedEventAttributes()).count();
   }
 
-  long signalsInHistory(String documentId) {
-    return client.fetchHistory(DocumentRequestWorkflow.workflowId(documentId)).getEvents().stream()
-        .filter(ev -> ev.hasWorkflowExecutionSignaledEventAttributes()).count();
-  }
-
   /** A Reassign is a Signal, so it returns before the workflow acts on it: wait for the next task. */
   void awaitTask(DocumentRequestWorkflow wf, String taskId) throws InterruptedException {
     Instant giveUp = Instant.now().plusSeconds(10);
@@ -249,7 +244,7 @@ class DocumentRequestWorkflowTest {
     var wf = begin(doc("h3", "Equipment", "invoice", 3000));
     awaitStep(wf, Steps.HUMAN_TASK);
 
-    wf.reassign(new ReassignTask("h3-t1", " Bob ", "on leave"));
+    wf.reassign(new ReassignTask("h3-t1", "Bob", "on leave"));
     awaitTask(wf, "h3-t2");
     assertEquals("Bob", attr(wf, SearchAttrs.ASSIGNEE));
     assertEquals(Steps.HUMAN_TASK, step(wf));
@@ -281,22 +276,6 @@ class DocumentRequestWorkflowTest {
 
     assertEquals(0, updatesInHistory("h4"), "refused updates must not be written to history");
     assertEquals("Bob", attr(wf, SearchAttrs.ASSIGNEE));
-  }
-
-  @Test
-  void blankOrStaleReassignmentIsIgnoredButRecorded() throws Exception {
-    start(false);
-    fake.route(Route.HUMAN_REVIEW, 1);
-    var wf = begin(doc("h5", "Equipment", "invoice", 3000));
-    awaitStep(wf, Steps.HUMAN_TASK);
-
-    wf.reassign(new ReassignTask("h5-t1", "  ", ""));
-    wf.reassign(new ReassignTask("h5-nope", "Carol", ""));
-    // Signals are handled in order. Had either of those applied, this one would be for a stale task.
-    wf.reassign(new ReassignTask("h5-t1", "Bob", ""));
-    awaitTask(wf, "h5-t2");
-    assertEquals("Bob", attr(wf, SearchAttrs.ASSIGNEE));
-    assertEquals(3, signalsInHistory("h5"), "a Signal can't be refused, so ignored ones are still in history");
   }
 
   @Test

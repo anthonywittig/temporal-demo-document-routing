@@ -33,7 +33,7 @@ public interface DocumentRequestWorkflow {
   @UpdateValidatorMethod(updateName = "Complete")
   void validateComplete(CompleteTask action);
 
-  /** HumanReview: hand the open task to someone else. Ignored if the task isn't open or no one is named. */
+  /** HumanReview: hand the open task to someone else. */
   @SignalMethod(name = "Reassign")
   void reassign(ReassignTask action);
 

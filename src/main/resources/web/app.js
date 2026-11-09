@@ -109,14 +109,8 @@ function complete(task, commentInput, buttons) {
 }
 
 function reassign(task, assigneeInput, commentInput, buttons) {
-  const assignee = assigneeInput.value.trim();
-  if (!assignee) {
-    toast("Type who to reassign it to", "warn");
-    assigneeInput.focus();
-    return;
-  }
   taskAction("/api/tasks/reassign",
-    { workflowId: task.workflowId, taskId: task.taskId, assignee, comment: commentInput.value }, buttons);
+    { workflowId: task.workflowId, taskId: task.taskId, assignee: assigneeInput.value.trim(), comment: commentInput.value }, buttons);
 }
 
 let inboxSignature = "";

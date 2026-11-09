@@ -175,11 +175,7 @@ public final class WebServer {
 
   private void reassignTask(Context ctx) throws Exception {
     JsonNode body = JSON.readTree(ctx.body());
-    String assignee = body.path("assignee").asText("").trim();
-    if (assignee.isEmpty()) {
-      ctx.status(400).json(Map.of("error", "Say who to reassign the task to"));
-      return;
-    }
+    String assignee = body.path("assignee").asText();
     ReassignTask action = new ReassignTask(body.path("taskId").asText(), assignee, body.path("comment").asText(""));
     try {
       client.newWorkflowStub(DocumentRequestWorkflow.class, body.path("workflowId").asText()).reassign(action);
@@ -187,8 +183,7 @@ public final class WebServer {
       ctx.status(404).json(Map.of("error", "This request has finished; the task is no longer open"));
       return;
     }
-    // The Signal is in the history now, worker or not. Whether it applied shows in the inbox: the
-    // workflow ignores a Reassign for a task that's no longer open.
+    // The Signal is in the history now, worker or not; the workflow acts on it when a worker runs.
     ctx.json(Map.of("taskId", action.taskId(), "message", "Reassign to " + assignee));
   }
 
