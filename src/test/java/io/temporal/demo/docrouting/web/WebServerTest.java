@@ -129,12 +129,9 @@ class WebServerTest {
     assertEquals(12000L, awaitTask(workflowId, documentId + "-t1").get(SearchAttrs.COST));
 
     String t1 = "{\"workflowId\":\"" + workflowId + "\",\"taskId\":\"" + documentId + "-t1\"";
-    var blank = call("POST", "/api/tasks/reassign", t1 + ",\"assignee\":\"  \"}");
-    assertEquals(400, blank.statusCode(), blank.body());
-
     var reassigned = call("POST", "/api/tasks/reassign", t1 + ",\"assignee\":\"Bob\",\"comment\":\"over to you\"}");
     assertEquals(200, reassigned.statusCode(), reassigned.body());
-    assertEquals("Alice reassigned it to Bob", JSON.readTree(reassigned.body()).get("message").asText());
+    assertEquals("Reassign to Bob", JSON.readTree(reassigned.body()).get("message").asText());
     assertEquals("Bob", awaitTask(workflowId, documentId + "-t2").get(SearchAttrs.ASSIGNEE));
 
     var stale = call("POST", "/api/tasks/complete", t1 + "}");
@@ -145,6 +142,12 @@ class WebServerTest {
         "{\"workflowId\":\"" + workflowId + "\",\"taskId\":\"" + documentId + "-t2\",\"comment\":\"\"}");
     assertEquals(200, done.statusCode(), done.body());
     assertEquals("Completed by Bob", JSON.readTree(done.body()).get("message").asText());
+  }
+
+  @Test
+  void reassigningAFinishedRequestIsNotFound() throws Exception {
+    var res = call("POST", "/api/tasks/reassign", "{\"workflowId\":\"doc-nope\",\"taskId\":\"nope-t1\",\"assignee\":\"Bob\"}");
+    assertEquals(404, res.statusCode(), res.body());
   }
 
   /** Polls the request's search attributes until the given task is open. */

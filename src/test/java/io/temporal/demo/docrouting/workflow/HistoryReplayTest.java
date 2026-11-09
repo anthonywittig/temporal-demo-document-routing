@@ -85,6 +85,7 @@ class HistoryReplayTest {
     record("v1-human-review.json", Route.HUMAN_REVIEW, false, (wf, client) -> {
       awaitStep(wf, Steps.HUMAN_TASK);
       wf.reassign(new ReassignTask("rec-humanreview-t1", "Bob", "recorded"));
+      awaitTask(wf, "rec-humanreview-t2");
       wf.complete(new CompleteTask("rec-humanreview-t2", "recorded"));
     });
     record("v1-invoice.json", Route.INVOICE, false, (wf, client) -> {
@@ -123,6 +124,14 @@ class HistoryReplayTest {
 
       String json = client.fetchHistory(DocumentRequestWorkflow.workflowId(id)).toJson(true);
       Files.writeString(FIXTURES.resolve(file), json);
+    }
+  }
+
+  private static void awaitTask(DocumentRequestWorkflow wf, String expected) throws InterruptedException {
+    Instant giveUp = Instant.now().plusSeconds(10);
+    while (!expected.equals(WorkflowStub.fromTyped(wf).describe().getTypedSearchAttributes().get(SearchAttrs.TASK_ID))) {
+      if (Instant.now().isAfter(giveUp)) fail("task " + expected + " never opened");
+      Thread.sleep(50);
     }
   }
 

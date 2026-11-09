@@ -90,7 +90,7 @@ function slaCell(task) {
   return el("span", { class: left <= 15 ? "pill warn" : "pill" }, `${m}:${s} left`);
 }
 
-// Complete and Reassign are Updates on the request. The action is credited to the task's assignee.
+// Complete is an Update on the request and Reassign a Signal. The action is credited to the task's assignee.
 async function taskAction(path, body, buttons) {
   buttons.forEach((b) => (b.disabled = true));
   const { ok, data } = await api("POST", path, body);
@@ -109,14 +109,8 @@ function complete(task, commentInput, buttons) {
 }
 
 function reassign(task, assigneeInput, commentInput, buttons) {
-  const assignee = assigneeInput.value.trim();
-  if (!assignee) {
-    toast("Type who to reassign it to", "warn");
-    assigneeInput.focus();
-    return;
-  }
   taskAction("/api/tasks/reassign",
-    { workflowId: task.workflowId, taskId: task.taskId, assignee, comment: commentInput.value }, buttons);
+    { workflowId: task.workflowId, taskId: task.taskId, assignee: assigneeInput.value.trim(), comment: commentInput.value }, buttons);
 }
 
 let inboxSignature = "";
