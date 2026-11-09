@@ -57,7 +57,7 @@ Keep a third terminal free for beat 6's reset command and beat 7's second worker
 A healthy start shows the following on http://localhost:8080:
 - the top bar shows **rules v1** and `task queue · document-routing`;
 - five document chips;
-- the **Routing rules** card shows **v1**, with Services at 5000 and Equipment at 1000, both with first assignee Alice;
+- the **Routing rules** card shows **v1**, with Services at 5000 (first assignee Alice) and Equipment at 1000 (first assignee Bob);
 - **ERP is up** and **Supplier portal accepts purchase orders**;
 - an empty **Human tasks** list ("No open tasks.") and an empty **Recent requests** list.
 
@@ -96,7 +96,7 @@ Thirty-second version: "A document comes in, is classified, and business-unit ru
 
 ### 2. Same cost, different unit; change a rule live
 
-1. Click **Equipment · invoice · $3,000**. It appears under **Human tasks**, assigned to **Alice**, with rules **v1** and an SLA countdown. Its `EvaluateRules` result in the Temporal UI gives the reason: "Equipment: cost 3000 is above the human-review threshold 1000; first review goes to Alice". **Leave it there**: it's the in-flight request for this beat and beat 3.
+1. Click **Equipment · invoice · $3,000**. It appears under **Human tasks**, assigned to **Bob**, with rules **v1** and an SLA countdown. Its `EvaluateRules` result in the Temporal UI gives the reason: "Equipment: cost 3000 is above the human-review threshold 1000; first review goes to Bob". **Leave it there**: it's the in-flight request for this beat and beat 3.
 2. Say: "Same cost as the Services invoice, different business unit, different path. Each business unit has its own threshold, and its own first reviewer. They come from rules held outside the workflow, which stand in for Drools or any rules engine."
 3. In the **Routing rules** card, change Equipment to `5000` and click **Save as v2**. A toast says "Saved rules v2: the next evaluation uses them", and the card and the top bar show **rules v2**. (The card writes `data/rules.json`. Editing that file by hand does the same thing: set `"version": 2` and the Equipment `"humanReviewAbove"` to `5000`, and save.)
 4. Click **Equipment · invoice · $3,000** again. This time it goes straight to path **Invoice** and completes, with rules **v2** on its row.
@@ -106,19 +106,19 @@ Thirty-second version: "A document comes in, is classified, and business-unit ru
 
 ### 3. A person hands it on, and someone finishes it; the SLA runs out
 
-1. Under **Human tasks**, the Equipment request from beat 2 is assigned to **Alice**, with task ID `…-t1` under the document ID. Type `Bob` in its reassign box, add a comment, and click **Reassign**. A toast says "Reassign to Bob: recorded by Temporal". The row now shows **Bob**, task `…-t2`, and a fresh SLA countdown.
-2. Click **Waiting on Alice** under **Temporal UI views**. The request isn't there any more. Say: "A person's queue is a visibility query on the `Assignee` search attribute. There's no inbox service to keep in sync, and it works with no worker running."
-3. Optional, for a stale click: each assignment has a new task ID, so an action on an old one is refused. In the third terminal, try to complete Alice's task on that request (use its document ID):
+1. Under **Human tasks**, the Equipment request from beat 2 is assigned to **Bob**, with task ID `…-t1` under the document ID. Type `Alice` in its reassign box, add a comment, and click **Reassign**. A toast says "Reassign to Alice: recorded by Temporal". The row now shows **Alice**, task `…-t2`, and a fresh SLA countdown.
+2. Click **Waiting on Alice** under **Temporal UI views**. The request is in Alice's queue now. Say: "A person's queue is a visibility query on the `Assignee` search attribute. There's no inbox service to keep in sync, and it works with no worker running."
+3. Optional, for a stale click: each assignment has a new task ID, so an action on an old one is refused. In the third terminal, try to complete Bob's task on that request (use its document ID):
 
    ```sh
    temporal workflow update execute --disable-config-file -w doc-<ID> --name Complete --input '{"taskId":"<ID>-t1","comment":""}'
    ```
 
    It fails with "Task <ID>-t1 is no longer open; the open task is <ID>-t2". The Update's validator refused it, and nothing was written to history.
-4. On Bob's row, click **Complete**. A toast says "Completed by Bob: recorded by Temporal", and the row leaves the list. In **Recent requests** it shows path **HumanReview**, step **Completed**.
+4. On Alice's row, click **Complete**. A toast says "Completed by Alice: recorded by Temporal", and the row leaves the list. In **Recent requests** it shows path **HumanReview**, step **Completed**.
 5. Open it in the Temporal UI. After `EvaluateRules` (v1 → `HumanReview`), the history shows:
    - the first `ReviewSla` timer;
-   - the Signal `Reassign`, with the task ID, Bob and the comment, after which that timer is canceled and a second `ReviewSla` starts for Bob;
+   - the Signal `Reassign`, with the task ID, Alice and the comment, after which that timer is canceled and a second `ReviewSla` starts for Alice;
    - the Update `Complete`;
    - `NotifyRequester`.
 

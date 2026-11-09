@@ -2,7 +2,7 @@
 
 A document arrives, is classified, and business-unit rules route it down one of three paths:
 
-- **`HumanReview`.** A person finishes the request. The first task goes to the business unit's first assignee from the rules (Alice by default); whoever holds it can complete it, which notifies the requester and ends the request, or reassign it to anyone by name. Each assignment has its own SLA.
+- **`HumanReview`.** A person finishes the request. The first task goes to the business unit's first assignee from the rules (by default, Alice for Services and Bob for Equipment); whoever holds it can complete it, which notifies the requester and ends the request, or reassign it to anyone by name. Each assignment has its own SLA.
 - **`Invoice`.** The invoice is posted to the ERP, which confirms the posting asynchronously, and the requester is notified.
 - **`PurchaseOrder`.** Budget is reserved against the purchase order's cost center, which fails without retrying if the cost center is unknown, and the PO is sent to the supplier portal. If the supplier rejects it, the budget reservation is released.
 
