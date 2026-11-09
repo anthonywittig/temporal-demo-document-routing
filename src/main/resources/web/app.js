@@ -90,22 +90,33 @@ function slaCell(task) {
   return el("span", { class: left <= 15 ? "pill warn" : "pill" }, `${m}:${s} left`);
 }
 
-async function review(task, approved, commentInput, buttons) {
+// Complete and Reassign are Updates on the request. The action is credited to the task's assignee.
+async function taskAction(path, body, buttons) {
   buttons.forEach((b) => (b.disabled = true));
-  const { ok, data } = await api("POST", "/api/review", {
-    workflowId: task.workflowId,
-    taskId: task.taskId,
-    approved,
-    reviewer: $("reviewer").value || "Sam Chen",
-    comment: commentInput.value,
-  });
+  const { ok, data } = await api("POST", path, body);
   if (ok && data?.pending) toast(data.error, "warn");
   else if (ok) toast(`${data.message}: recorded by Temporal`);
   else {
-    toast(data?.error || "The decision was not recorded", "error");
+    toast(data?.error || "Nothing was recorded", "error");
     buttons.forEach((b) => (b.disabled = false));
   }
   refresh();
+}
+
+function complete(task, commentInput, buttons) {
+  taskAction("/api/tasks/complete",
+    { workflowId: task.workflowId, taskId: task.taskId, comment: commentInput.value }, buttons);
+}
+
+function reassign(task, assigneeInput, commentInput, buttons) {
+  const assignee = assigneeInput.value.trim();
+  if (!assignee) {
+    toast("Type who to reassign it to", "warn");
+    assigneeInput.focus();
+    return;
+  }
+  taskAction("/api/tasks/reassign",
+    { workflowId: task.workflowId, taskId: task.taskId, assignee, comment: commentInput.value }, buttons);
 }
 
 let inboxSignature = "";
@@ -124,23 +135,26 @@ function renderInbox(inbox) {
   }
   inboxSignature = signature;
   if (!inbox.length) {
-    body.replaceChildren(el("tr", {}, el("td", { colspan: 6, class: "muted" }, "No open tasks.")));
+    body.replaceChildren(el("tr", {}, el("td", { colspan: 7, class: "muted" }, "No open tasks.")));
     return;
   }
   body.replaceChildren(...inbox.map((t) => {
     const comment = el("input", { class: "comment", placeholder: "comment (optional)" });
-    const approve = el("button", { class: "button small", title: "Approve the cost and route it on through the rules" }, "Approve");
-    const reject = el("button", { class: "button small ghost", title: "Reject the request and close it" }, "Reject");
-    approve.addEventListener("click", () => review(t, true, comment, [approve, reject]));
-    reject.addEventListener("click", () => review(t, false, comment, [approve, reject]));
+    const to = el("input", { class: "assignee", placeholder: "Bob", size: 8, "aria-label": "Reassign to" });
+    const done = el("button", { class: "button small", title: "Finish the task; the request completes" }, "Complete");
+    const hand = el("button", { class: "button small ghost", title: "Hand the task to the person named" }, "Reassign");
+    done.addEventListener("click", () => complete(t, comment, [done, hand]));
+    hand.addEventListener("click", () => reassign(t, to, comment, [done, hand]));
+    to.addEventListener("keydown", (e) => { if (e.key === "Enter") hand.click(); });
     return el("tr", { class: t.slaBreached ? "breached" : "" },
       el("td", {}, el("a", { href: uiWorkflowUrl(t.workflowId, t.runId), target: "_blank", rel: "noopener" }, t.documentId),
-        el("div", { class: "muted small" }, t.routingReason || "")),
+        el("div", { class: "muted small" }, t.taskId || "")),
+      el("td", {}, t.assignee || ""),
       el("td", {}, t.businessUnit),
       el("td", {}, money(t.cost)),
       el("td", {}, t.rulesVersion ? `v${t.rulesVersion}` : ""),
       el("td", { "data-sla": t.taskId }, slaCell(t)),
-      el("td", { class: "actions" }, comment, approve, reject));
+      el("td", { class: "actions" }, comment, done, to, hand));
   }));
 }
 
@@ -274,10 +288,11 @@ async function resetData() {
 function renderViews() {
   const views = [
     ["Waiting on a person", 'Step="HumanTask" AND ExecutionStatus="Running"'],
+    ["Waiting on Alice", 'Step="HumanTask" AND Assignee="Alice" AND ExecutionStatus="Running"'],
     ["SLA breached", "SlaBreached=true"],
     ["Failed at budget reservation", 'ExecutionStatus="Failed" AND Step="ReserveBudget"'],
     ["Waiting for the ERP to confirm", 'Step="AwaitErpConfirmation" AND ExecutionStatus="Running"'],
-    ["Rejected (by a reviewer or the supplier)", 'Step="Rejected"'],
+    ["Rejected by the supplier", 'Step="Rejected"'],
     ["Services", 'BusinessUnit="Services"'],
     ["Equipment", 'BusinessUnit="Equipment"'],
     ["All document requests", 'WorkflowType="DocumentRequestWorkflow"'],

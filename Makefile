@@ -31,7 +31,13 @@ SEARCH_ATTRIBUTES := \
 	--search-attribute Path=Keyword \
 	--search-attribute BusinessUnit=Keyword \
 	--search-attribute SlaBreached=Bool \
-	--search-attribute RulesVersion=Int
+	--search-attribute RulesVersion=Int \
+	--search-attribute Cost=Int \
+	--search-attribute CostCenter=Keyword \
+	--search-attribute DocType=Keyword \
+	--search-attribute Assignee=Keyword \
+	--search-attribute TaskId=Keyword \
+	--search-attribute SlaDeadline=Datetime
 
 # Each process runs in its own JVM, not inside Maven, so its logs reach the
 # terminal and Ctrl-C stops just that process.
