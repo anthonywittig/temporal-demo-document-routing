@@ -31,10 +31,9 @@ public class DocumentActivitiesImpl implements DocumentActivities {
   }
 
   @Override
-  public ClassifyOutput classify(ClassifyInput input) {
+  public ClassifyOutput classify(DocumentRequest doc) {
     pause(); // to slow the demo down
     // A stand-in for a real classifier: the scenario carries its type.
-    DocumentRequest doc = input.doc();
     String type = doc.docType() == null || doc.docType().isBlank() ? "invoice" : doc.docType();
     return new ClassifyOutput(type.toLowerCase());
   }
@@ -51,8 +50,8 @@ public class DocumentActivitiesImpl implements DocumentActivities {
   }
 
   @Override
-  public PostInvoiceToErpOutput postInvoiceToErp(PostInvoiceToErpInput input) {
-    String postingId = post("/erp/invoices", input.doc(), Map.of("callbackUrl", webUrl + "/callbacks/erp"))
+  public PostInvoiceToErpOutput postInvoiceToErp(DocumentRequest doc) {
+    String postingId = post("/erp/invoices", doc, Map.of("callbackUrl", webUrl + "/callbacks/erp"))
         .path("postingId").asText();
     return new PostInvoiceToErpOutput(postingId);
   }
@@ -64,28 +63,26 @@ public class DocumentActivitiesImpl implements DocumentActivities {
   }
 
   @Override
-  public ReserveBudgetOutput reserveBudget(ReserveBudgetInput input) {
-    DocumentRequest doc = input.doc();
+  public ReserveBudgetOutput reserveBudget(DocumentRequest doc) {
     post("/tasks/reserve-budget", doc, Map.of("detail", "$" + doc.cost() + " from " + doc.costCenter()));
     return new ReserveBudgetOutput();
   }
 
   @Override
-  public ReleaseBudgetOutput releaseBudget(ReleaseBudgetInput input) {
-    DocumentRequest doc = input.doc();
+  public ReleaseBudgetOutput releaseBudget(DocumentRequest doc) {
     post("/tasks/reserve-budget/undo", doc, Map.of("detail", "$" + doc.cost() + " to " + doc.costCenter()));
     return new ReleaseBudgetOutput();
   }
 
   @Override
-  public SendPurchaseOrderOutput sendPurchaseOrder(SendPurchaseOrderInput input) {
-    post("/supplier-portal/purchase-orders", input.doc(), Map.of());
+  public SendPurchaseOrderOutput sendPurchaseOrder(DocumentRequest doc) {
+    post("/supplier-portal/purchase-orders", doc, Map.of());
     return new SendPurchaseOrderOutput();
   }
 
   @Override
-  public ArchiveDocumentOutput archiveDocument(ArchiveDocumentInput input) {
-    post("/archive", input.doc(), Map.of("detail", input.doc().documentId()));
+  public ArchiveDocumentOutput archiveDocument(DocumentRequest doc) {
+    post("/archive", doc, Map.of("detail", doc.documentId()));
     return new ArchiveDocumentOutput();
   }
 

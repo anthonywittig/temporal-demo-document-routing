@@ -1,23 +1,18 @@
 package io.temporal.demo.docrouting.workflow;
 
 import io.temporal.activity.Activity;
-import io.temporal.demo.docrouting.activities.ArchiveDocumentInput;
 import io.temporal.demo.docrouting.activities.ArchiveDocumentOutput;
-import io.temporal.demo.docrouting.activities.ClassifyInput;
 import io.temporal.demo.docrouting.activities.ClassifyOutput;
 import io.temporal.demo.docrouting.activities.DocumentActivities;
 import io.temporal.demo.docrouting.activities.EvaluateRulesInput;
 import io.temporal.demo.docrouting.activities.HttpCalls;
 import io.temporal.demo.docrouting.activities.NotifyRequesterInput;
 import io.temporal.demo.docrouting.activities.NotifyRequesterOutput;
-import io.temporal.demo.docrouting.activities.PostInvoiceToErpInput;
 import io.temporal.demo.docrouting.activities.PostInvoiceToErpOutput;
-import io.temporal.demo.docrouting.activities.ReleaseBudgetInput;
 import io.temporal.demo.docrouting.activities.ReleaseBudgetOutput;
-import io.temporal.demo.docrouting.activities.ReserveBudgetInput;
 import io.temporal.demo.docrouting.activities.ReserveBudgetOutput;
-import io.temporal.demo.docrouting.activities.SendPurchaseOrderInput;
 import io.temporal.demo.docrouting.activities.SendPurchaseOrderOutput;
+import io.temporal.demo.docrouting.model.DocumentRequest;
 import io.temporal.demo.docrouting.model.Route;
 import io.temporal.demo.docrouting.model.RoutingDecision;
 import io.temporal.failure.ApplicationFailure;
@@ -48,9 +43,9 @@ public class FakeActivities implements DocumentActivities {
   }
 
   @Override
-  public ClassifyOutput classify(ClassifyInput input) {
+  public ClassifyOutput classify(DocumentRequest doc) {
     record();
-    return new ClassifyOutput(input.doc().docType());
+    return new ClassifyOutput(doc.docType());
   }
 
   @Override
@@ -60,7 +55,7 @@ public class FakeActivities implements DocumentActivities {
   }
 
   @Override
-  public PostInvoiceToErpOutput postInvoiceToErp(PostInvoiceToErpInput input) {
+  public PostInvoiceToErpOutput postInvoiceToErp(DocumentRequest doc) {
     record();
     return new PostInvoiceToErpOutput("A-test");
   }
@@ -73,23 +68,23 @@ public class FakeActivities implements DocumentActivities {
   }
 
   @Override
-  public ReserveBudgetOutput reserveBudget(ReserveBudgetInput input) {
+  public ReserveBudgetOutput reserveBudget(DocumentRequest doc) {
     record();
     if (costCenterUnknown) {
       throw ApplicationFailure.newNonRetryableFailure(
-          "Budget: unknown cost center " + input.doc().costCenter(), HttpCalls.REJECTED);
+          "Budget: unknown cost center " + doc.costCenter(), HttpCalls.REJECTED);
     }
     return new ReserveBudgetOutput();
   }
 
   @Override
-  public ReleaseBudgetOutput releaseBudget(ReleaseBudgetInput input) {
+  public ReleaseBudgetOutput releaseBudget(DocumentRequest doc) {
     record();
     return new ReleaseBudgetOutput();
   }
 
   @Override
-  public SendPurchaseOrderOutput sendPurchaseOrder(SendPurchaseOrderInput input) {
+  public SendPurchaseOrderOutput sendPurchaseOrder(DocumentRequest doc) {
     record();
     if (supplierRejects) {
       throw ApplicationFailure.newNonRetryableFailure("Supplier portal rejected the purchase order", HttpCalls.REJECTED);
@@ -98,7 +93,7 @@ public class FakeActivities implements DocumentActivities {
   }
 
   @Override
-  public ArchiveDocumentOutput archiveDocument(ArchiveDocumentInput input) {
+  public ArchiveDocumentOutput archiveDocument(DocumentRequest doc) {
     record();
     return new ArchiveDocumentOutput();
   }
