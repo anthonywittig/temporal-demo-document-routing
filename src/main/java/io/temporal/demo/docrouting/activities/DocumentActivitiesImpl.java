@@ -57,33 +57,28 @@ public class DocumentActivitiesImpl implements DocumentActivities {
   }
 
   @Override
-  public NotifyRequesterOutput notifyRequester(NotifyRequesterInput input) {
+  public void notifyRequester(NotifyRequesterInput input) {
     post("/notify", input.doc(), Map.of("detail", input.doc().requester() + ": " + input.message()));
-    return new NotifyRequesterOutput();
   }
 
   @Override
-  public ReserveBudgetOutput reserveBudget(DocumentRequest doc) {
+  public void reserveBudget(DocumentRequest doc) {
     post("/tasks/reserve-budget", doc, Map.of("detail", "$" + doc.cost() + " from " + doc.costCenter()));
-    return new ReserveBudgetOutput();
   }
 
   @Override
-  public ReleaseBudgetOutput releaseBudget(DocumentRequest doc) {
+  public void releaseBudget(DocumentRequest doc) {
     post("/tasks/reserve-budget/undo", doc, Map.of("detail", "$" + doc.cost() + " to " + doc.costCenter()));
-    return new ReleaseBudgetOutput();
   }
 
   @Override
-  public SendPurchaseOrderOutput sendPurchaseOrder(DocumentRequest doc) {
+  public void sendPurchaseOrder(DocumentRequest doc) {
     post("/supplier-portal/purchase-orders", doc, Map.of());
-    return new SendPurchaseOrderOutput();
   }
 
   @Override
-  public ArchiveDocumentOutput archiveDocument(DocumentRequest doc) {
+  public void archiveDocument(DocumentRequest doc) {
     post("/archive", doc, Map.of("detail", doc.documentId()));
-    return new ArchiveDocumentOutput();
   }
 
   private com.fasterxml.jackson.databind.JsonNode post(String path, DocumentRequest doc, Map<String, Object> extra) {
