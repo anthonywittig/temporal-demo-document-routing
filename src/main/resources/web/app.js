@@ -90,12 +90,12 @@ function slaCell(task) {
   return el("span", { class: left <= 15 ? "pill warn" : "pill" }, `${m}:${s} left`);
 }
 
-async function review(task, action, commentInput, buttons) {
+async function review(task, approved, commentInput, buttons) {
   buttons.forEach((b) => (b.disabled = true));
   const { ok, data } = await api("POST", "/api/review", {
     workflowId: task.workflowId,
     taskId: task.taskId,
-    action,
+    approved,
     reviewer: $("reviewer").value || "Sam Chen",
     comment: commentInput.value,
   });
@@ -131,8 +131,8 @@ function renderInbox(inbox) {
     const comment = el("input", { class: "comment", placeholder: "comment (optional)" });
     const approve = el("button", { class: "button small", title: "Approve the cost and route it on through the rules" }, "Approve");
     const reject = el("button", { class: "button small ghost", title: "Reject the request and close it" }, "Reject");
-    approve.addEventListener("click", () => review(t, "APPROVE", comment, [approve, reject]));
-    reject.addEventListener("click", () => review(t, "REJECT", comment, [approve, reject]));
+    approve.addEventListener("click", () => review(t, true, comment, [approve, reject]));
+    reject.addEventListener("click", () => review(t, false, comment, [approve, reject]));
     return el("tr", { class: t.slaBreached ? "breached" : "" },
       el("td", {}, el("a", { href: uiWorkflowUrl(t.workflowId, t.runId), target: "_blank", rel: "noopener" }, t.documentId),
         el("div", { class: "muted small" }, t.routingReason || "")),
