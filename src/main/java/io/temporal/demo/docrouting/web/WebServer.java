@@ -46,9 +46,9 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * The demo page's backend. It starts requests, relays Complete and Reassign on human tasks as Updates, turns
- * the ERP's confirmation callbacks into Signals, and reads everything it shows from Temporal visibility,
- * so the page keeps working while no worker is running.
+ * The demo page's backend. It starts requests, relays Complete on a human task as an Update and Reassign
+ * as a Signal, turns the ERP's confirmation callbacks into Signals, and reads everything it shows from
+ * Temporal visibility, so the page keeps working while no worker is running.
  */
 public final class WebServer {
   private static final Logger log = LoggerFactory.getLogger(WebServer.class);
@@ -165,7 +165,7 @@ public final class WebServer {
     return "D" + Integer.toString(0x10000 + RANDOM.nextInt(0xEFFFF), 36).toUpperCase();
   }
 
-  // ---- human tasks: Complete and Reassign, relayed as Updates ---------------------------------
+  // ---- human tasks: Complete as an Update, Reassign as a Signal -------------------------------
 
   private void completeTask(Context ctx) throws Exception {
     JsonNode body = JSON.readTree(ctx.body());
@@ -175,13 +175,16 @@ public final class WebServer {
 
   private void reassignTask(Context ctx) throws Exception {
     JsonNode body = JSON.readTree(ctx.body());
-    String assignee = body.path("assignee").asText("").trim();
-    if (assignee.isEmpty()) {
-      ctx.status(400).json(Map.of("error", "Say who to reassign the task to"));
+    String assignee = body.path("assignee").asText();
+    ReassignTask action = new ReassignTask(body.path("taskId").asText(), assignee, body.path("comment").asText(""));
+    try {
+      client.newWorkflowStub(DocumentRequestWorkflow.class, body.path("workflowId").asText()).reassign(action);
+    } catch (WorkflowNotFoundException e) {
+      ctx.status(404).json(Map.of("error", "This request has finished; the task is no longer open"));
       return;
     }
-    ReassignTask action = new ReassignTask(body.path("taskId").asText(), assignee, body.path("comment").asText(""));
-    sendTaskUpdate(ctx, body.path("workflowId").asText(), wf -> wf.reassign(action));
+    // The Signal is in the history now, worker or not; the workflow acts on it when a worker runs.
+    ctx.json(Map.of("taskId", action.taskId(), "message", "Reassign to " + assignee));
   }
 
   private void sendTaskUpdate(Context ctx, String workflowId, Function<DocumentRequestWorkflow, TaskResult> update)
