@@ -4,7 +4,6 @@ import static org.junit.jupiter.api.Assertions.*;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import io.temporal.api.enums.v1.IndexedValueType;
 import io.temporal.client.WorkflowStub;
 import io.temporal.demo.docrouting.Config;
 import io.temporal.demo.docrouting.model.DocumentRequest;
@@ -13,7 +12,10 @@ import io.temporal.demo.docrouting.model.Route;
 import io.temporal.demo.docrouting.rules.RulesLoader;
 import io.temporal.demo.docrouting.workflow.DocumentRequestWorkflow;
 import io.temporal.demo.docrouting.workflow.DocumentRequestWorkflowImpl;
+import io.temporal.common.SearchAttributes;
 import io.temporal.demo.docrouting.workflow.FakeActivities;
+import io.temporal.demo.docrouting.workflow.SearchAttrs;
+import io.temporal.demo.docrouting.workflow.TestSearchAttributes;
 import io.temporal.demo.docrouting.workflow.WorkflowSettings;
 import io.temporal.testing.TestWorkflowEnvironment;
 import io.temporal.worker.Worker;
@@ -44,11 +46,7 @@ class WebServerTest {
     Files.copy(Path.of("config/rules.default.json"), dir.resolve("rules.json"));
     Files.copy(Path.of("config/reference-data.default.json"), dir.resolve("reference-data.json"));
     env = TestWorkflowEnvironment.newInstance();
-    for (var sa : new String[] {"Step", "Path", "BusinessUnit"}) {
-      env.registerSearchAttribute(sa, IndexedValueType.INDEXED_VALUE_TYPE_KEYWORD);
-    }
-    env.registerSearchAttribute("SlaBreached", IndexedValueType.INDEXED_VALUE_TYPE_BOOL);
-    env.registerSearchAttribute("RulesVersion", IndexedValueType.INDEXED_VALUE_TYPE_INT);
+    TestSearchAttributes.register(env);
 
     Config config = Config.from(Map.of("DATA_DIR", dir.toString(), "SYSTEMS_URL", "http://localhost:1"));
     Worker worker = env.newWorker(config.taskQueue());
@@ -117,6 +115,47 @@ class WebServerTest {
     var res = call("POST", "/api/submit", "{\"scenario\":\"cc99-batch\"}");
     assertEquals(200, res.statusCode());
     assertEquals(3, JSON.readTree(res.body()).get("results").size());
+  }
+
+  @Test
+  void tasksCanBeReassignedThenCompleted() throws Exception {
+    fake.route(Route.HUMAN_REVIEW, 1);
+    var res = call("POST", "/api/submit", "{\"scenario\":\"services-invoice-12000\"}");
+    String workflowId = JSON.readTree(res.body()).get("results").get(0).get("workflowId").asText();
+    String documentId = workflowId.substring("doc-".length());
+
+    // The test server has no list queries, so the inbox itself is checked in the rehearsal on a dev server.
+    assertEquals("Alice", awaitTask(workflowId, documentId + "-t1").get(SearchAttrs.ASSIGNEE));
+    assertEquals(12000L, awaitTask(workflowId, documentId + "-t1").get(SearchAttrs.COST));
+
+    String t1 = "{\"workflowId\":\"" + workflowId + "\",\"taskId\":\"" + documentId + "-t1\"";
+    var blank = call("POST", "/api/tasks/reassign", t1 + ",\"assignee\":\"  \"}");
+    assertEquals(400, blank.statusCode(), blank.body());
+
+    var reassigned = call("POST", "/api/tasks/reassign", t1 + ",\"assignee\":\"Bob\",\"comment\":\"over to you\"}");
+    assertEquals(200, reassigned.statusCode(), reassigned.body());
+    assertEquals("Alice reassigned it to Bob", JSON.readTree(reassigned.body()).get("message").asText());
+    assertEquals("Bob", awaitTask(workflowId, documentId + "-t2").get(SearchAttrs.ASSIGNEE));
+
+    var stale = call("POST", "/api/tasks/complete", t1 + "}");
+    assertEquals(409, stale.statusCode(), stale.body());
+    assertTrue(stale.body().contains(documentId + "-t2"), stale.body());
+
+    var done = call("POST", "/api/tasks/complete",
+        "{\"workflowId\":\"" + workflowId + "\",\"taskId\":\"" + documentId + "-t2\",\"comment\":\"\"}");
+    assertEquals(200, done.statusCode(), done.body());
+    assertEquals("Completed by Bob", JSON.readTree(done.body()).get("message").asText());
+  }
+
+  /** Polls the request's search attributes until the given task is open. */
+  SearchAttributes awaitTask(String workflowId, String taskId) throws Exception {
+    long giveUp = System.currentTimeMillis() + 10_000;
+    while (System.currentTimeMillis() < giveUp) {
+      var attrs = env.getWorkflowClient().newUntypedWorkflowStub(workflowId).describe().getTypedSearchAttributes();
+      if (taskId.equals(attrs.get(SearchAttrs.TASK_ID))) return attrs;
+      Thread.sleep(100);
+    }
+    throw new AssertionError("task " + taskId + " never opened");
   }
 
   JsonNode rulesFile() throws Exception {

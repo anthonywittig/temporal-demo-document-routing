@@ -9,23 +9,21 @@ import io.temporal.demo.docrouting.model.DocumentRequest;
 import io.temporal.demo.docrouting.model.Route;
 import io.temporal.demo.docrouting.model.RoutingDecision;
 import io.temporal.failure.ApplicationFailure;
-import java.util.ArrayDeque;
 import java.util.Collections;
-import java.util.Deque;
 import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
 
 /** Scriptable activities for workflow tests. Records every call by activity type, in order. */
 public class FakeActivities implements DocumentActivities {
   public final List<String> calls = new CopyOnWriteArrayList<>();
-  final Deque<RoutingDecision> decisions = new ArrayDeque<>();
-  /** The costApproved flag passed to each evaluateRules call, in order. */
-  public final List<Boolean> costApprovedFlags = new CopyOnWriteArrayList<>();
+  /** The message of each notifyRequester call, in order. */
+  public final List<String> notifications = new CopyOnWriteArrayList<>();
+  private volatile RoutingDecision decision;
   volatile boolean costCenterUnknown;
   volatile boolean supplierRejects;
 
   public FakeActivities route(Route path, int version) {
-    decisions.add(new RoutingDecision(path, "test routes to " + path, version));
+    decision = (new RoutingDecision(path, "test routes to " + path, version));
     return this;
   }
 
@@ -44,11 +42,9 @@ public class FakeActivities implements DocumentActivities {
   }
 
   @Override
-  public synchronized RoutingDecision evaluateRules(EvaluateRulesInput input) {
+  public RoutingDecision evaluateRules(EvaluateRulesInput input) {
     record();
-    costApprovedFlags.add(input.costApproved());
-    // The last scripted decision repeats once the script runs out.
-    return decisions.size() > 1 ? decisions.poll() : decisions.peek();
+    return decision;
   }
 
   @Override
@@ -60,6 +56,7 @@ public class FakeActivities implements DocumentActivities {
   @Override
   public void notifyRequester(NotifyRequesterInput input) {
     record();
+    notifications.add(input.message());
   }
 
   @Override

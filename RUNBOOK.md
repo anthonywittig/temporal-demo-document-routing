@@ -21,7 +21,7 @@ During the talk you change the rules live, stop the worker and the external syst
 The demo makes five problems visible:
 
 - **Routing rules change more often than code.** Rules live in a JSON file outside the workflow. A change takes effect on the next request with no deploy, and each decision records the rules version that made it. Beats 2 and 3.
-- **People take time, and their decisions change the route.** The human task waits durably, with an SLA. A rejection ends the request; an approval re-evaluates it against the rules in force at that moment, and counts only if they still want a review. Beat 3.
+- **People take time, and hand work to each other.** The human task waits durably, with an SLA for each person who holds it. Whoever has it can finish it or hand it to someone else, and every hand-off is in the history. Beat 3.
 - **External systems fail, slowly or for good.** Outages are retried with backoff. Rejections are not retried, and completed steps are undone in reverse. Beats 4 and 5.
 - **Bad data needs a fix and a replay, not a dead-letter queue.** Failed requests stay where they failed, searchable, and are replayed in bulk after the data is fixed. Beat 6.
 - **Shipping new code can't break requests in flight.** Each request is pinned to the worker version it started on, and old versions drain. Beat 7.
@@ -47,7 +47,7 @@ For a rehearsal, start the worker with `SLA_DURATION=20s make worker` so SLA bre
 In two terminals:
 
 1. `make up`: starts three processes in this terminal, and `Ctrl-C` stops all three:
-   - the Temporal dev server, with UI at http://localhost:8233. It registers the `Step`, `Path`, `BusinessUnit`, `SlaBreached` and `RulesVersion` search attributes;
+   - the Temporal dev server, with UI at http://localhost:8233. It registers the search attributes the page and the views query: `Step`, `Path`, `BusinessUnit`, `SlaBreached`, `RulesVersion`, `Cost`, `CostCenter`, `DocType`, `Assignee`, `TaskId` and `SlaDeadline`;
    - the mock external systems on :8090. Beat 4's optional harder outage stops and starts these;
    - the demo app at http://localhost:8080.
 2. `make worker`: worker version `v1`. You stop and start this one in beat 4. On a fresh dev server it logs `had no current version; made v1 current`. Start it once the dev server is up.
@@ -59,7 +59,7 @@ A healthy start shows the following on http://localhost:8080:
 - five document chips;
 - the **Routing rules** card shows **v1**, with Services at 5000 and Equipment at 1000;
 - **ERP is up** and **Supplier portal accepts purchase orders**;
-- an empty **Reviewer inbox** ("No open tasks.") and an empty **Recent requests** list.
+- an empty **Human tasks** list ("No open tasks.") and an empty **Recent requests** list.
 
 Open the **Temporal UI ↗** link in the second tab.
 
@@ -73,7 +73,7 @@ Thirty-second version: "A document comes in, is classified, and business-unit ru
 |---|---|---|
 | 1. A document is posted to the ERP | 6 | |
 | 2. Same cost, different unit; change a rule live | 10 | |
-| 3. A person approves it; the SLA runs out | 10 | |
+| 3. A person hands it on, and someone finishes it; the SLA runs out | 10 | |
 | 4. Take the ERP and the worker away | 8 | |
 | 5. The supplier says no; the budget is released | 7 | |
 | 6. Bad data: find, fix, replay in bulk | 10 | |
@@ -96,7 +96,7 @@ Thirty-second version: "A document comes in, is classified, and business-unit ru
 
 ### 2. Same cost, different unit; change a rule live
 
-1. Click **Equipment · invoice · $3,000**. It appears in the **Reviewer inbox** with the reason "Equipment: cost 3000 is above the human-review threshold 1000", rules **v1**, and an SLA countdown. **Leave it there**: it's the in-flight request for this beat and beat 3.
+1. Click **Equipment · invoice · $3,000**. It appears under **Human tasks**, assigned to **Alice**, with rules **v1** and an SLA countdown. Its `EvaluateRules` result in the Temporal UI gives the reason: "Equipment: cost 3000 is above the human-review threshold 1000". **Leave it there**: it's the in-flight request for this beat and beat 3.
 2. Say: "Same cost as the Services invoice, different business unit, different path. Each business unit has its own threshold. It comes from rules held outside the workflow, which stand in for Drools or any rules engine."
 3. In the **Routing rules** card, change Equipment to `5000` and click **Save as v2**. A toast says "Saved rules v2: the next evaluation uses them", and the card and the top bar show **rules v2**. (The card writes `data/rules.json`. Editing that file by hand does the same thing: set `"version": 2` and the Equipment `"humanReviewAbove"` to `5000`, and save.)
 4. Click **Equipment · invoice · $3,000** again. This time it goes straight to path **Invoice** and completes, with rules **v2** on its row.
@@ -104,17 +104,31 @@ Thirty-second version: "A document comes in, is classified, and business-unit ru
 6. Say: "No deploy. The rules live outside the workflow, in a file this card writes, standing in for your rules engine and its admin screen. The next evaluation read the new version. The request already in flight keeps the decision it made, because that decision and its rules version are in its history. It won't silently change route under someone."
 7. Optional, to show validation: in the card, type `-5` for a threshold and save. The toast refuses it ("must not be negative"), and the version doesn't change. A broken hand edit to `data/rules.json` (delete a closing brace) is rejected too: the rules badge turns amber, and a banner says "rules.json edit rejected; still using v2". Rollback is the same move as a change: save the previous threshold, which becomes the next version.
 
-### 3. A person approves it; the SLA runs out
+### 3. A person hands it on, and someone finishes it; the SLA runs out
 
-1. In the inbox, on the Equipment request from beat 2, type a comment and click **Approve**. A toast says "Approved by Sam Chen: recorded by Temporal".
-2. The request goes back through the rules in force now, **v2**, carrying the approval. Under v2 the cost is within Equipment's new threshold, so the rules don't need a review any more and route it to `Invoice` on their own; it completes. Open it in the Temporal UI: there are two `EvaluateRules` results, v1 → `HumanReview` ("cost 3000 is above the human-review threshold 1000") and then v2 → `Invoice` ("cost 3000 is within 5000"), with the Update `Review` between them carrying the reviewer and the comment. Had v2 still put the cost above the threshold, the approval would have stood in for that review, and the reason would read "cost 3000 is above …, approved by a reviewer".
-3. Say: "Approval is a loop in code, not a special feature. The request re-runs the rules in force now. The approval only matters if those rules still want a person to look; if they don't, the new rules route it. It arrived under v1, and its second decision was made by v2. Whoever opens the history sees both decisions, which rules made each one, and who made the call in between."
-4. Click **Services · invoice · $12,000**. It lands in the inbox (above the Services threshold of 5000). Click **Waiting on a person** under **Temporal UI views** to show the same list in the Temporal UI.
-5. Let the SLA run out while you talk (60 seconds by default). The row turns red with **SLA breached**. In the Temporal UI, **SLA breached** lists it, and the request's timeline shows the fired `ReviewSla` (1m) timer.
-6. Say: "The SLA is a durable timer. Breaching it flags the request; it doesn't cancel it. A late decision still counts. In production the flag is what you alert on."
-7. **Don't approve or reject this one.** It's the open v1 request for beat 7.
-8. Optional, for a stale click: if anyone asks about double-clicks, act on a task twice. The second click says "Task … is no longer open". The Update's validator rejected it, and nothing was written to history.
-9. Optional, for the other answer: click **Services · invoice · $12,000** again and **Reject** the new task (not the breached one). Its row in **Recent requests** reads **Rejected**, at step **Rejected**. In its history, the Update `Review` is followed only by `NotifyRequester`: no ERP posting, no archive.
+1. Under **Human tasks**, the Equipment request from beat 2 is assigned to **Alice**, with task ID `…-t1` under the document ID. Type `Bob` in its reassign box, add a comment, and click **Reassign**. A toast says "Alice reassigned it to Bob: recorded by Temporal". The row now shows **Bob**, task `…-t2`, and a fresh SLA countdown.
+2. Click **Waiting on Alice** under **Temporal UI views**. The request isn't there any more. Say: "A person's queue is a visibility query on the `Assignee` search attribute. There's no inbox service to keep in sync, and it works with no worker running."
+3. Optional, for a stale click: each assignment has a new task ID, so an action on an old one is refused. In the third terminal, try to complete Alice's task on that request (use its document ID):
+
+   ```sh
+   temporal workflow update execute --disable-config-file -w doc-<ID> --name Complete --input '{"taskId":"<ID>-t1","comment":""}'
+   ```
+
+   It fails with "Task <ID>-t1 is no longer open; the open task is <ID>-t2". The Update's validator refused it, and nothing was written to history.
+4. On Bob's row, click **Complete**. A toast says "Completed by Bob: recorded by Temporal", and the row leaves the list. In **Recent requests** it shows path **HumanReview**, step **Completed**.
+5. Open it in the Temporal UI. After `EvaluateRules` (v1 → `HumanReview`), the history shows:
+   - the first `ReviewSla` timer;
+   - the Update `Reassign`, with Bob and the comment, after which that timer is canceled and a second `ReviewSla` starts for Bob;
+   - the Update `Complete`;
+   - `NotifyRequester`.
+
+   There's no ERP posting: the person's decision is the end of this path.
+6. Say: "The human task is the path. The workflow waited durably for a person, seconds here and days in production, and each hand-off is in the history: who had it, who it went to, and who finished it. Each assignment has its own SLA, so a breach means the person holding it now is late."
+7. Click **Services · invoice · $12,000**. It lands under **Human tasks**, assigned to Alice (above the Services threshold of 5000). Click **Waiting on a person** under **Temporal UI views** to show the same list in the Temporal UI.
+8. Let the SLA run out while you talk (60 seconds by default). The row turns red with **SLA breached**. In the Temporal UI, **SLA breached** lists it, and the request's timeline shows the fired `ReviewSla` (1m) timer.
+9. Say: "The SLA is a durable timer. Breaching it flags the request; it doesn't cancel it. The task can still be completed, or reassigned, which starts a new SLA for the next person. In production the flag is what you alert on."
+10. **Don't complete or reassign this one.** It's the open v1 request for beat 7.
+11. If asked what happens when a task bounces between people for months: each hand-off adds a few events to the history. A long-lived task would use Continue-As-New to start a fresh history that carries the open task over. This demo doesn't need it.
 
 ### 4. Take the ERP and the worker away
 
@@ -187,12 +201,12 @@ Thirty-second version: "A document comes in, is classified, and business-unit ru
 
 ### 7. Ship v2 while v1 requests are still open
 
-The Services $12,000 request from beat 3 should still be open in the inbox, on v1.
+The Services $12,000 request from beat 3 should still be open under **Human tasks**, on v1.
 
 1. In the third terminal: `make worker BUILD_ID=v2`. It starts polling. v1 is still current, so new requests still go to v1.
 2. `make promote BUILD_ID=v2`. It prints "Successfully set the current worker deployment version".
 3. Click **Services · invoice · $3,000**. Its row shows version **v2**. In the Temporal UI, its history ends with an `ArchiveDocument` step that v1 doesn't have.
-4. In the inbox, **Approve** the open $12,000 request. It goes on down `Invoice` on v1 code and completes. Its row shows **v1**, and its history has no `ArchiveDocument` step.
+4. Under **Human tasks**, click **Complete** on the open $12,000 request. It finishes on v1 code. Its row shows **v1**, and its history has no `ArchiveDocument` step.
 5. Say: "Two versions of the workflow ran side by side. Each request is pinned to the version it started on. v2 adds a step, and replaying an old history against new code is exactly what breaks naïve deploys. Old requests finish on old code, new requests get new code, and nobody had to stop anything."
 6. Show it draining:
 
@@ -207,6 +221,7 @@ The Services $12,000 request from beat 3 should still be open in the inbox, on v
 
 1. In the Temporal UI, use the links from the page:
    - **Waiting on a person**: the count at the top answers "how many requests are at this step";
+   - **Waiting on Alice**: one person's queue, from the same attribute that drives the page;
    - **SLA breached**: "which ones are late";
    - **Services** and **Equipment**: per business unit.
 2. Open any request and switch the Event History to **Timeline**. Say: "This is the 'where am I' view for UAT: completed steps, the current step, and how long each took. The `Step` search attribute is what the counts are built on."
@@ -218,7 +233,7 @@ Links are relative to this directory and point at line ranges. They are not pinn
 
 ### One execution per document
 
-[`DocumentRequestWorkflow.java` lines 21–23](src/main/java/io/temporal/demo/docrouting/workflow/DocumentRequestWorkflow.java#L21-L23) and [`WebServer.java` lines 136 and 154](src/main/java/io/temporal/demo/docrouting/web/WebServer.java#L132-L159):
+[`DocumentRequestWorkflow.java` lines 22–24](src/main/java/io/temporal/demo/docrouting/workflow/DocumentRequestWorkflow.java#L22-L24) and [`WebServer.java` lines 140 and 155](src/main/java/io/temporal/demo/docrouting/web/WebServer.java#L135-L160):
 
 ```java
 static String workflowId(String documentId) { return "doc-" + documentId; }
@@ -232,49 +247,59 @@ Every side-effecting call also sends `Idempotency-Key: <workflowId>/<activity ty
 
 ### Routing runs in an Activity, and the decision is recorded
 
-[`DocumentRequestWorkflowImpl.java` lines 68–70](src/main/java/io/temporal/demo/docrouting/workflow/DocumentRequestWorkflowImpl.java#L68-L70):
+[`DocumentRequestWorkflowImpl.java` lines 73–75](src/main/java/io/temporal/demo/docrouting/workflow/DocumentRequestWorkflowImpl.java#L73-L75):
 
 ```java
-RoutingDecision route = activities.evaluateRules(new EvaluateRulesInput(doc, docType, humanReviewApproved()));
+RoutingDecision route = activities.evaluateRules(new EvaluateRulesInput(doc, docType));
 Workflow.upsertTypedSearchAttributes(
     PATH.valueSet(route.path().value()), RULES_VERSION.valueSet((long) route.rulesVersion()));
 ```
 
-The rules file is read on every evaluation and validated, and the last good version is kept: [`RulesLoader.java` lines 62–82 and 93–142](src/main/java/io/temporal/demo/docrouting/rules/RulesLoader.java#L62-L142). Swap this class for a Drools or decision-table call and nothing else changes.
+The rules file is read on every evaluation and validated, and the last good version is kept: [`RulesLoader.java` lines 62–82 and 92–143](src/main/java/io/temporal/demo/docrouting/rules/RulesLoader.java#L62-L143). Swap this class for a Drools or decision-table call and nothing else changes.
 
-### A human task: an Update with a validator
+### A human task: Updates with validators
 
-[`DocumentRequestWorkflowImpl.java` lines 120–137](src/main/java/io/temporal/demo/docrouting/workflow/DocumentRequestWorkflowImpl.java#L120-L137):
+Each assignment is a task with its own ID. The workflow waits until whoever holds it completes it or hands it on ([`DocumentRequestWorkflowImpl.java` lines 86–96](src/main/java/io/temporal/demo/docrouting/workflow/DocumentRequestWorkflowImpl.java#L86-L96)):
 
 ```java
-public void validateReview(ReviewDecision d) {
-  if (openTaskId == null || d == null || !openTaskId.equals(d.taskId())) {
-    throw new IllegalArgumentException("Task " + d.taskId() + " is no longer open" ...);
-  }
-  ...
+assignee = FIRST_ASSIGNEE;                       // "Alice"
+for (int n = 1; !completed; n++) {
+  humanTask(doc.documentId() + "-t" + n);        // opens the task, starts its SLA, waits
+  if (reassignTo != null) assignee = reassignTo;
 }
 ```
 
-A rejected Update is never written to history. An accepted one carries the reviewer and the comment.
-
-### An SLA that flags without cancelling
-
-[`DocumentRequestWorkflowImpl.java` lines 103–113](src/main/java/io/temporal/demo/docrouting/workflow/DocumentRequestWorkflowImpl.java#L103-L113):
+`Complete` and `Reassign` are Updates, and each validator checks the task is the open one ([lines 124–158](src/main/java/io/temporal/demo/docrouting/workflow/DocumentRequestWorkflowImpl.java#L124-L158)):
 
 ```java
+public void validateReassign(ReassignTask action) {
+  requireOpenTask(action.taskId());              // "Task … is no longer open; the open task is …"
+  if (action.assignee() == null || action.assignee().isBlank()) throw new IllegalArgumentException(...);
+}
+```
+
+A refused Update is never written to history. An accepted one carries the task ID, the comment and, for `Reassign`, the new assignee.
+
+### An SLA per assignment that flags without cancelling
+
+[`DocumentRequestWorkflowImpl.java` lines 104–121](src/main/java/io/temporal/demo/docrouting/workflow/DocumentRequestWorkflowImpl.java#L104-L121):
+
+```java
+Workflow.upsertTypedSearchAttributes(STEP.valueSet(Steps.HUMAN_TASK), ASSIGNEE.valueSet(assignee),
+    TASK_ID.valueSet(taskId), SLA_DEADLINE.valueSet(deadline), SLA_BREACHED.valueSet(false));
 CancellationScope sla = Workflow.newCancellationScope(() ->
     Workflow.newTimer(settings.slaDuration(), named("ReviewSla")).handle((ignored, canceled) -> {
       if (canceled == null) Workflow.upsertTypedSearchAttributes(SLA_BREACHED.valueSet(true));
       return null;
     }));
 sla.run();
-Workflow.await(() -> humanReviewDecision != null);
+Workflow.await(() -> completed || reassignTo != null);
 sla.cancel();
 ```
 
 ### Turn a callback into a Signal
 
-The web app receives the ERP's confirmation callback and signals the workflow ([`WebServer.java` lines 206–222](src/main/java/io/temporal/demo/docrouting/web/WebServer.java#L206-L222)). The workflow waits with a deadline ([`DocumentRequestWorkflowImpl.java` lines 151–162](src/main/java/io/temporal/demo/docrouting/workflow/DocumentRequestWorkflowImpl.java#L151-L162)):
+The web app receives the ERP's confirmation callback and signals the workflow ([`WebServer.java` lines 213–229](src/main/java/io/temporal/demo/docrouting/web/WebServer.java#L213-L229)). The workflow waits with a deadline ([`DocumentRequestWorkflowImpl.java` lines 162–175](src/main/java/io/temporal/demo/docrouting/workflow/DocumentRequestWorkflowImpl.java#L162-L175)):
 
 ```java
 // a named timer, so the Temporal UI shows "WaitForErpConfirmation (2m)"
@@ -285,7 +310,7 @@ if (!awaitWithTimer(settings.callbackTimeout(), "WaitForErpConfirmation", () -> 
 
 ### Let the failure decide whether to retry
 
-[`HttpCalls.java` lines 51–60](src/main/java/io/temporal/demo/docrouting/activities/HttpCalls.java#L51-L60), with the policy in [`DocumentRequestWorkflowImpl.java` lines 34–41](src/main/java/io/temporal/demo/docrouting/workflow/DocumentRequestWorkflowImpl.java#L34-L41):
+[`HttpCalls.java` lines 51–60](src/main/java/io/temporal/demo/docrouting/activities/HttpCalls.java#L51-L60), with the policy in [`DocumentRequestWorkflowImpl.java` lines 35–42](src/main/java/io/temporal/demo/docrouting/workflow/DocumentRequestWorkflowImpl.java#L35-L42):
 
 ```java
 if (isRetryable(status)) throw ApplicationFailure.newFailure(message, TRANSIENT);   // 5xx, 408, 429
@@ -294,7 +319,7 @@ throw ApplicationFailure.newNonRetryableFailure(message, REJECTED);             
 
 ### Undo completed steps
 
-[`DocumentRequestWorkflowImpl.java` lines 173–193](src/main/java/io/temporal/demo/docrouting/workflow/DocumentRequestWorkflowImpl.java#L173-L193):
+[`DocumentRequestWorkflowImpl.java` lines 184–205](src/main/java/io/temporal/demo/docrouting/workflow/DocumentRequestWorkflowImpl.java#L184-L205):
 
 ```java
 Saga saga = new Saga(new Saga.Options.Builder().setParallelCompensation(false).build());
@@ -306,7 +331,9 @@ catch (ActivityFailure e) { saga.compensate(); ... }
 
 ### Progress you can search, and an inbox that needs no worker
 
-The workflow upserts the `Step` search attribute at every step (the first is [`DocumentRequestWorkflowImpl.java` line 63](src/main/java/io/temporal/demo/docrouting/workflow/DocumentRequestWorkflowImpl.java#L63)), and puts the task details in its memo ([line 100](src/main/java/io/temporal/demo/docrouting/workflow/DocumentRequestWorkflowImpl.java#L96-L100)). The inbox is a visibility query, not a Query, so it works with no worker running ([`WebServer.java` lines 236–243](src/main/java/io/temporal/demo/docrouting/web/WebServer.java#L236-L243)):
+The workflow upserts the `Step` search attribute at every step (the first is [`DocumentRequestWorkflowImpl.java` line 69](src/main/java/io/temporal/demo/docrouting/workflow/DocumentRequestWorkflowImpl.java#L69)), and keeps everything the inbox shows in search attributes too: `Cost` and `CostCenter` at the start, `DocType` after `Classify`, and `Assignee`, `TaskId` and `SlaDeadline` for each task ([lines 66–72 and 104–109](src/main/java/io/temporal/demo/docrouting/workflow/DocumentRequestWorkflowImpl.java#L66-L109)). There's no memo, so every column is also a filter in the Temporal UI, such as `Step="HumanTask" AND Assignee="Alice"`.
+
+The inbox is a visibility query, not a Query, so it works with no worker running ([`WebServer.java` lines 243–250](src/main/java/io/temporal/demo/docrouting/web/WebServer.java#L243-L250)):
 
 ```java
 client.listExecutions("WorkflowType=\"DocumentRequestWorkflow\" AND ExecutionStatus=\"Running\" AND Step=\"HumanTask\"")
@@ -333,7 +360,7 @@ WorkerDeploymentOptions.newBuilder()
 - **The external systems are one mock process,** with an in-memory idempotency store that forgets everything on restart. Real systems keep idempotency keys durably.
 - **Every activity pauses 500ms before it runs** (`ACTIVITY_DELAY`), so the steps are spaced out in the Temporal UI timeline. Without it they finish within milliseconds of each other. Set `ACTIVITY_DELAY=0s` to turn it off.
 - **The classifier reads the scenario's type.** A real classifier would be an OCR or ML call behind the same Activity.
-- **The web app is not a product UI.** It has no sign-in, no roles and no SSO; a single reviewer name is typed in. Role-based access and SSO are Temporal Cloud and application concerns, covered in the documentation.
+- **The web app is not a product UI.** It has no sign-in, no roles and no SSO; anyone can complete or reassign any task, and the action is credited to the person it's assigned to. Role-based access and SSO are Temporal Cloud and application concerns, covered in the documentation.
 - **Payload encryption is off.** Temporal's Data Converter encrypts payloads before they leave the worker, with your keys (one per customer if needed), so the service never sees document data. Not shown here.
 - **Metrics and dashboards aren't wired up.** The SDK emits OpenTelemetry metrics (activity and workflow latencies, failures, task backlogs) that go to whatever metrics and alerting stack you already use (Prometheus and Grafana, Datadog and so on).
 - **Draining is the only migration shown.** Moving in-flight requests to a new version (with the new code guarded so it replays old histories) is supported but not demonstrated.
@@ -361,7 +388,7 @@ WorkerDeploymentOptions.newBuilder()
 | A request shows **Failed** at step **PostToErp** (or another external step) | The external system was down longer than the retry bound, about 3 minutes (20 attempts) | Bring the system back (untick **ERP is DOWN**, or start `make systems`), then replay as in beat 6: `temporal workflow reset --disable-config-file --query 'ExecutionStatus="Failed" AND Step="PostToErp"' --type FirstWorkflowTask --reason "ERP back"`, and type `y` to confirm |
 | An `Invoice` request sits at **PostToErp** with attempts climbing | The **ERP is DOWN (503)** toggle is still on, perhaps from beat 4 | Untick it; the next retry succeeds |
 | A new request stays at step **Received** | No worker is running, or the deployment has no current version | `make worker`. If it's running, check `temporal worker deployment describe --name document-routing --disable-config-file` and `make promote BUILD_ID=v1` |
-| Toast "No worker has accepted the decision yet…" | The worker is stopped | Start `make worker`. The decision is applied when it starts; clicking again is safe |
+| Toast "No worker has accepted this yet…" | The worker is stopped | Start `make worker`. The Complete or Reassign is applied when it starts; clicking again is safe |
 | An `Invoice` request sits at **AwaitErpConfirmation** | The ERP's callback can't reach the web app | Keep `make up` running; the ERP retries the callback. After `CALLBACK_TIMEOUT` (2 minutes) the request fails with "The ERP did not confirm the posting" |
 | The page shows **rules v2** (or later) right after starting | An earlier rehearsal's edits are still in `data/` | Click **Reset demo data** |
 | Rules badge is amber and a banner says the edit was rejected | `data/rules.json` doesn't parse or validate | Fix the file, or save from the **Routing rules** card, which writes a valid file; the banner names the problem. The last good version stays in force meanwhile |

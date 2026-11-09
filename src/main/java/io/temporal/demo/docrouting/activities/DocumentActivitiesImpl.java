@@ -43,7 +43,7 @@ public class DocumentActivitiesImpl implements DocumentActivities {
     pause(); // to slow the demo down
     DocumentRequest doc = input.doc();
     try {
-      return rules.evaluate(doc.businessUnit(), input.docType(), doc.cost(), input.costApproved());
+      return rules.evaluate(doc.businessUnit(), input.docType(), doc.cost());
     } catch (RulesLoader.UnknownBusinessUnitException | RulesLoader.UnknownDocumentTypeException e) {
       throw ApplicationFailure.newNonRetryableFailure(e.getMessage(), HttpCalls.REJECTED);
     }

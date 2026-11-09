@@ -15,10 +15,11 @@ import io.temporal.client.WorkflowOptions;
 import io.temporal.client.WorkflowUpdateException;
 import io.temporal.common.SearchAttributes;
 import io.temporal.demo.docrouting.Config;
+import io.temporal.demo.docrouting.model.CompleteTask;
 import io.temporal.demo.docrouting.model.DocumentRequest;
 import io.temporal.demo.docrouting.model.ErpConfirmation;
-import io.temporal.demo.docrouting.model.ReviewDecision;
-import io.temporal.demo.docrouting.model.ReviewResult;
+import io.temporal.demo.docrouting.model.ReassignTask;
+import io.temporal.demo.docrouting.model.TaskResult;
 import io.temporal.demo.docrouting.rules.RulesLoader;
 import io.temporal.demo.docrouting.workflow.DocumentRequestWorkflow;
 import io.temporal.demo.docrouting.workflow.SearchAttrs.Steps;
@@ -29,6 +30,7 @@ import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.security.SecureRandom;
 import java.time.Duration;
+import java.time.OffsetDateTime;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
@@ -38,11 +40,12 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+import java.util.function.Function;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * The demo page's backend. It starts requests, relays reviewer decisions as Updates, turns
+ * The demo page's backend. It starts requests, relays Complete and Reassign on human tasks as Updates, turns
  * the ERP's confirmation callbacks into Signals, and reads everything it shows from Temporal visibility,
  * so the page keeps working while no worker is running.
  */
@@ -82,7 +85,8 @@ public final class WebServer {
         "taskQueue", config.taskQueue(),
         "scenarios", Scenarios.ALL)));
     app.post("/api/submit", this::submit);
-    app.post("/api/review", this::review);
+    app.post("/api/tasks/complete", this::completeTask);
+    app.post("/api/tasks/reassign", this::reassignTask);
     app.get("/api/state", this::state);
     app.put("/api/control", this::putControl);
     app.put("/api/rules", this::putRules);
@@ -137,12 +141,9 @@ public final class WebServer {
             .setTypedSearchAttributes(SearchAttributes.newBuilder()
                 .set(SearchAttrs.STEP, Steps.RECEIVED)
                 .set(SearchAttrs.BUSINESS_UNIT, doc.businessUnit())
+                .set(SearchAttrs.COST, doc.cost())
+                .set(SearchAttrs.COST_CENTER, doc.costCenter())
                 .build())
-            .setMemo(Map.of(
-                "documentId", doc.documentId(),
-                "docType", doc.docType(),
-                "cost", doc.cost(),
-                "costCenter", doc.costCenter()))
             .build());
     Map<String, Object> result = new LinkedHashMap<>();
     result.put("documentId", doc.documentId());
@@ -163,31 +164,37 @@ public final class WebServer {
     return "D" + Integer.toString(0x10000 + RANDOM.nextInt(0xEFFFF), 36).toUpperCase();
   }
 
-  // ---- review -------------------------------------------------------------------------------
+  // ---- human tasks: Complete and Reassign, relayed as Updates ---------------------------------
 
-  private void review(Context ctx) throws Exception {
+  private void completeTask(Context ctx) throws Exception {
     JsonNode body = JSON.readTree(ctx.body());
-    String workflowId = body.path("workflowId").asText();
-    if (!body.path("approved").isBoolean()) {
-      ctx.status(400).json(Map.of("error", "Say whether the cost is approved (true or false)"));
+    CompleteTask action = new CompleteTask(body.path("taskId").asText(), body.path("comment").asText(""));
+    sendTaskUpdate(ctx, body.path("workflowId").asText(), wf -> wf.complete(action));
+  }
+
+  private void reassignTask(Context ctx) throws Exception {
+    JsonNode body = JSON.readTree(ctx.body());
+    String assignee = body.path("assignee").asText("").trim();
+    if (assignee.isEmpty()) {
+      ctx.status(400).json(Map.of("error", "Say who to reassign the task to"));
       return;
     }
-    ReviewDecision decision = new ReviewDecision(
-        body.path("taskId").asText(),
-        body.path("approved").asBoolean(),
-        body.path("reviewer").asText("Sam Chen"),
-        body.path("comment").asText(""));
+    ReassignTask action = new ReassignTask(body.path("taskId").asText(), assignee, body.path("comment").asText(""));
+    sendTaskUpdate(ctx, body.path("workflowId").asText(), wf -> wf.reassign(action));
+  }
 
+  private void sendTaskUpdate(Context ctx, String workflowId, Function<DocumentRequestWorkflow, TaskResult> update)
+      throws Exception {
     DocumentRequestWorkflow wf = client.newWorkflowStub(DocumentRequestWorkflow.class, workflowId);
     // An Update needs a worker to validate and accept it. If none is running, the request keeps
     // waiting in the background and is applied when a worker starts. Don't claim otherwise.
-    CompletableFuture<ReviewResult> pending = CompletableFuture.supplyAsync(() -> wf.review(decision));
+    CompletableFuture<TaskResult> pending = CompletableFuture.supplyAsync(() -> update.apply(wf));
     try {
       ctx.json(pending.get(15, TimeUnit.SECONDS));
     } catch (TimeoutException e) {
       ctx.status(202).json(Map.of("pending", true, "error",
-          "No worker has accepted the decision yet; it will be applied when a worker starts (make worker). "
-              + "Clicking again is safe: a second decision on the same task is rejected."));
+          "No worker has accepted this yet; it will be applied when a worker starts (make worker). "
+              + "Clicking again is safe: a second action on the same task is refused."));
     } catch (ExecutionException e) {
       Throwable cause = e.getCause();
       if (cause instanceof WorkflowUpdateException u) {
@@ -265,11 +272,14 @@ public final class WebServer {
     out.put("slaBreached", Boolean.TRUE.equals(sa.get(SearchAttrs.SLA_BREACHED)));
     out.put("rulesVersion", sa.get(SearchAttrs.RULES_VERSION));
     out.put("version", buildId(sa, info));
-    for (String key : List.of("documentId", "docType", "costCenter", "taskId", "slaDeadline", "routingReason")) {
-      out.put(key, memo(m, key));
-    }
-    Object cost = m.getMemo("cost", Long.class);
-    out.put("cost", cost);
+    out.put("documentId", out.get("workflowId").toString().replaceFirst("^doc-", ""));
+    out.put("docType", sa.get(SearchAttrs.DOC_TYPE));
+    out.put("cost", sa.get(SearchAttrs.COST));
+    out.put("costCenter", sa.get(SearchAttrs.COST_CENTER));
+    out.put("assignee", sa.get(SearchAttrs.ASSIGNEE));
+    out.put("taskId", sa.get(SearchAttrs.TASK_ID));
+    OffsetDateTime slaDeadline = sa.get(SearchAttrs.SLA_DEADLINE);
+    out.put("slaDeadline", slaDeadline == null ? null : slaDeadline.toInstant().toString());
     return out;
   }
 
@@ -285,10 +295,6 @@ public final class WebServer {
     if (version == null) return "";
     int sep = version.lastIndexOf(':');
     return sep >= 0 ? version.substring(sep + 1) : version;
-  }
-
-  private static Object memo(WorkflowExecutionMetadata m, String key) {
-    return m.getMemo(key, String.class);
   }
 
   private static String statusName(WorkflowExecutionStatus s) {
