@@ -243,11 +243,11 @@ static String workflowId(String documentId) { return "doc-" + documentId; }
 } catch (WorkflowExecutionAlreadyStarted e) { /* duplicate: nothing new starts */ }
 ```
 
-Every side-effecting call also sends `Idempotency-Key: <workflowId>/<activity type>` ([`DocumentActivitiesImpl.java` line 102](src/main/java/io/temporal/demo/docrouting/activities/DocumentActivitiesImpl.java#L102)). The key is the same across retries and resets.
+Every side-effecting call also sends `Idempotency-Key: <workflowId>/<activity type>` ([`DocumentActivitiesImpl.java` line 99](src/main/java/io/temporal/demo/docrouting/activities/DocumentActivitiesImpl.java#L99)). The key is the same across retries and resets.
 
 ### Routing runs in an Activity, and the decision is recorded
 
-[`DocumentRequestWorkflowImpl.java` lines 79–81](src/main/java/io/temporal/demo/docrouting/workflow/DocumentRequestWorkflowImpl.java#L79-L81):
+[`DocumentRequestWorkflowImpl.java` lines 73–75](src/main/java/io/temporal/demo/docrouting/workflow/DocumentRequestWorkflowImpl.java#L73-L75):
 
 ```java
 RoutingDecision route = activities.evaluateRules(new EvaluateRulesInput(doc, docType));
@@ -259,7 +259,7 @@ The rules file is read on every evaluation and validated, and the last good vers
 
 ### A human task: Updates with validators
 
-Each assignment is a task with its own ID. The workflow waits until whoever holds it completes it or hands it on ([`DocumentRequestWorkflowImpl.java` lines 92–102](src/main/java/io/temporal/demo/docrouting/workflow/DocumentRequestWorkflowImpl.java#L92-L102)):
+Each assignment is a task with its own ID. The workflow waits until whoever holds it completes it or hands it on ([`DocumentRequestWorkflowImpl.java` lines 86–96](src/main/java/io/temporal/demo/docrouting/workflow/DocumentRequestWorkflowImpl.java#L86-L96)):
 
 ```java
 assignee = FIRST_ASSIGNEE;                       // "Alice"
@@ -269,7 +269,7 @@ for (int n = 1; !completed; n++) {
 }
 ```
 
-`Complete` and `Reassign` are Updates, and each validator checks the task is the open one ([lines 130–164](src/main/java/io/temporal/demo/docrouting/workflow/DocumentRequestWorkflowImpl.java#L130-L164)):
+`Complete` and `Reassign` are Updates, and each validator checks the task is the open one ([lines 124–158](src/main/java/io/temporal/demo/docrouting/workflow/DocumentRequestWorkflowImpl.java#L124-L158)):
 
 ```java
 public void validateReassign(ReassignTask action) {
@@ -282,7 +282,7 @@ A refused Update is never written to history. An accepted one carries the task I
 
 ### An SLA per assignment that flags without cancelling
 
-[`DocumentRequestWorkflowImpl.java` lines 110–127](src/main/java/io/temporal/demo/docrouting/workflow/DocumentRequestWorkflowImpl.java#L110-L127):
+[`DocumentRequestWorkflowImpl.java` lines 104–121](src/main/java/io/temporal/demo/docrouting/workflow/DocumentRequestWorkflowImpl.java#L104-L121):
 
 ```java
 Workflow.upsertTypedSearchAttributes(STEP.valueSet(Steps.HUMAN_TASK), ASSIGNEE.valueSet(assignee),
@@ -299,7 +299,7 @@ sla.cancel();
 
 ### Turn a callback into a Signal
 
-The web app receives the ERP's confirmation callback and signals the workflow ([`WebServer.java` lines 213–229](src/main/java/io/temporal/demo/docrouting/web/WebServer.java#L213-L229)). The workflow waits with a deadline ([`DocumentRequestWorkflowImpl.java` lines 168–181](src/main/java/io/temporal/demo/docrouting/workflow/DocumentRequestWorkflowImpl.java#L168-L181)):
+The web app receives the ERP's confirmation callback and signals the workflow ([`WebServer.java` lines 213–229](src/main/java/io/temporal/demo/docrouting/web/WebServer.java#L213-L229)). The workflow waits with a deadline ([`DocumentRequestWorkflowImpl.java` lines 162–175](src/main/java/io/temporal/demo/docrouting/workflow/DocumentRequestWorkflowImpl.java#L162-L175)):
 
 ```java
 // a named timer, so the Temporal UI shows "WaitForErpConfirmation (2m)"
@@ -310,7 +310,7 @@ if (!awaitWithTimer(settings.callbackTimeout(), "WaitForErpConfirmation", () -> 
 
 ### Let the failure decide whether to retry
 
-[`HttpCalls.java` lines 51–60](src/main/java/io/temporal/demo/docrouting/activities/HttpCalls.java#L51-L60), with the policy in [`DocumentRequestWorkflowImpl.java` lines 41–48](src/main/java/io/temporal/demo/docrouting/workflow/DocumentRequestWorkflowImpl.java#L41-L48):
+[`HttpCalls.java` lines 51–60](src/main/java/io/temporal/demo/docrouting/activities/HttpCalls.java#L51-L60), with the policy in [`DocumentRequestWorkflowImpl.java` lines 35–42](src/main/java/io/temporal/demo/docrouting/workflow/DocumentRequestWorkflowImpl.java#L35-L42):
 
 ```java
 if (isRetryable(status)) throw ApplicationFailure.newFailure(message, TRANSIENT);   // 5xx, 408, 429
@@ -319,19 +319,19 @@ throw ApplicationFailure.newNonRetryableFailure(message, REJECTED);             
 
 ### Undo completed steps
 
-[`DocumentRequestWorkflowImpl.java` lines 190–211](src/main/java/io/temporal/demo/docrouting/workflow/DocumentRequestWorkflowImpl.java#L190-L211):
+[`DocumentRequestWorkflowImpl.java` lines 184–205](src/main/java/io/temporal/demo/docrouting/workflow/DocumentRequestWorkflowImpl.java#L184-L205):
 
 ```java
 Saga saga = new Saga(new Saga.Options.Builder().setParallelCompensation(false).build());
-activities.reserveBudget(new ReserveBudgetInput(doc));
-saga.addCompensation(activities::releaseBudget, new ReleaseBudgetInput(doc));   // more steps would register theirs here
-try { activities.sendPurchaseOrder(new SendPurchaseOrderInput(doc)); }
+activities.reserveBudget(doc);
+saga.addCompensation(activities::releaseBudget, doc);   // more steps would register theirs here
+try { activities.sendPurchaseOrder(doc); }
 catch (ActivityFailure e) { saga.compensate(); ... }
 ```
 
 ### Progress you can search, and an inbox that needs no worker
 
-The workflow upserts the `Step` search attribute at every step (the first is [`DocumentRequestWorkflowImpl.java` line 75](src/main/java/io/temporal/demo/docrouting/workflow/DocumentRequestWorkflowImpl.java#L75)), and keeps everything the inbox shows in search attributes too: `Cost` and `CostCenter` at the start, `DocType` after `Classify`, and `Assignee`, `TaskId` and `SlaDeadline` for each task ([lines 72–78 and 110–115](src/main/java/io/temporal/demo/docrouting/workflow/DocumentRequestWorkflowImpl.java#L72-L115)). There's no memo, so every column is also a filter in the Temporal UI, such as `Step="HumanTask" AND Assignee="Alice"`.
+The workflow upserts the `Step` search attribute at every step (the first is [`DocumentRequestWorkflowImpl.java` line 69](src/main/java/io/temporal/demo/docrouting/workflow/DocumentRequestWorkflowImpl.java#L69)), and keeps everything the inbox shows in search attributes too: `Cost` and `CostCenter` at the start, `DocType` after `Classify`, and `Assignee`, `TaskId` and `SlaDeadline` for each task ([lines 66–72 and 104–109](src/main/java/io/temporal/demo/docrouting/workflow/DocumentRequestWorkflowImpl.java#L66-L109)). There's no memo, so every column is also a filter in the Temporal UI, such as `Step="HumanTask" AND Assignee="Alice"`.
 
 The inbox is a visibility query, not a Query, so it works with no worker running ([`WebServer.java` lines 243–250](src/main/java/io/temporal/demo/docrouting/web/WebServer.java#L243-L250)):
 

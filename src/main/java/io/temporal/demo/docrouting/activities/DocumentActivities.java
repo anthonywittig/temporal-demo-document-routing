@@ -1,6 +1,7 @@
 package io.temporal.demo.docrouting.activities;
 
 import io.temporal.activity.ActivityInterface;
+import io.temporal.demo.docrouting.model.DocumentRequest;
 import io.temporal.demo.docrouting.model.RoutingDecision;
 
 /**
@@ -16,26 +17,26 @@ import io.temporal.demo.docrouting.model.RoutingDecision;
 public interface DocumentActivities {
 
   /** Returns the document type. */
-  ClassifyOutput classify(ClassifyInput input);
+  ClassifyOutput classify(DocumentRequest doc);
 
   /** Reads the current routing rules; the decision, with its rules version, lands in history. */
   RoutingDecision evaluateRules(EvaluateRulesInput input);
 
   /** Invoice: post it to the ERP. Returns the ERP's posting ID; the confirmation arrives later as a Signal. */
-  PostInvoiceToErpOutput postInvoiceToErp(PostInvoiceToErpInput input);
+  PostInvoiceToErpOutput postInvoiceToErp(DocumentRequest doc);
 
   /** Every path: tell the requester the outcome. */
   NotifyRequesterOutput notifyRequester(NotifyRequesterInput input);
 
   /** PurchaseOrder: reserve the cost against its cost center. Fails without retry if the cost center is unknown. */
-  ReserveBudgetOutput reserveBudget(ReserveBudgetInput input);
+  ReserveBudgetOutput reserveBudget(DocumentRequest doc);
 
   /** PurchaseOrder compensation: release the budget reservation. */
-  ReleaseBudgetOutput releaseBudget(ReleaseBudgetInput input);
+  ReleaseBudgetOutput releaseBudget(DocumentRequest doc);
 
   /** PurchaseOrder: send the purchase order to the supplier portal. Fails without retry if the supplier rejects it. */
-  SendPurchaseOrderOutput sendPurchaseOrder(SendPurchaseOrderInput input);
+  SendPurchaseOrderOutput sendPurchaseOrder(DocumentRequest doc);
 
   /** v2 only: archive the processed document. */
-  ArchiveDocumentOutput archiveDocument(ArchiveDocumentInput input);
+  ArchiveDocumentOutput archiveDocument(DocumentRequest doc);
 }
