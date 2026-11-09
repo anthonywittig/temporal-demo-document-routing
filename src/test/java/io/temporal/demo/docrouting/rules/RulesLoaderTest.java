@@ -18,8 +18,8 @@ class RulesLoaderTest {
   static final String V1 = """
       { "version": 1,
         "businessUnits": {
-          "Services": { "humanReviewAbove": 5000 },
-          "Equipment": { "humanReviewAbove": 1000 } } }
+          "Services": { "humanReviewAbove": 5000, "firstAssignee": "Alice" },
+          "Equipment": { "humanReviewAbove": 1000, "firstAssignee": "Bob" } } }
       """;
 
   @BeforeEach
@@ -62,6 +62,29 @@ class RulesLoaderTest {
     assertEquals("Equipment: purchase-order documents go out as a purchase order (cost 800 is within 1000)", po.reason());
     var invoice = loader.evaluate("Services", "invoice", 300);
     assertEquals("Services: invoice documents are posted to the ERP (cost 300 is within 5000)", invoice.reason());
+  }
+
+  @Test
+  void humanReviewGoesFirstToTheUnitsAssignee() throws IOException {
+    Files.writeString(file, V1);
+    var services = loader.evaluate("Services", "invoice", 12000);
+    var equipment = loader.evaluate("Equipment", "invoice", 3000);
+    assertEquals("Alice", services.assignee());
+    assertEquals("Bob", equipment.assignee());
+    assertEquals("Equipment: cost 3000 is above the human-review threshold 1000; first review goes to Bob", equipment.reason());
+    assertNull(loader.evaluate("Services", "invoice", 300).assignee(), "only HumanReview has an assignee");
+  }
+
+  @Test
+  void missingOrBlankFirstAssigneeKeepsLastValidVersion() throws IOException {
+    loader.current();
+    Files.writeString(file, V1.replace("\"version\": 1", "\"version\": 2").replace(", \"firstAssignee\": \"Bob\"", ""));
+    assertEquals(1, loader.current().version());
+    assertTrue(loader.status().lastRejection().contains("Equipment.firstAssignee is required"), loader.status().lastRejection());
+
+    Files.writeString(file, V1.replace("\"version\": 1", "\"version\": 2").replace("\"Bob\"", "\" \""));
+    assertEquals(1, loader.current().version());
+    assertTrue(loader.status().lastRejection().contains("Equipment.firstAssignee is required"));
   }
 
   @Test
