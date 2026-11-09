@@ -47,7 +47,6 @@ public class DocumentActivitiesImpl implements DocumentActivities {
     } catch (RulesLoader.UnknownBusinessUnitException | RulesLoader.UnknownDocumentTypeException e) {
       throw ApplicationFailure.newNonRetryableFailure(e.getMessage(), HttpCalls.REJECTED);
     }
-    // No valid rules at all (IllegalStateException) stays retryable: fixing the file fixes it.
   }
 
   @Override
