@@ -172,13 +172,13 @@ class WebServerTest {
     JsonNode view = JSON.readTree(res.body());
     assertEquals(2, view.get("version").asInt());
     assertEquals(5000, view.get("units").get("Equipment").get("humanReviewAbove").asLong());
-    assertEquals("Alice", view.get("units").get("Equipment").get("firstAssignee").asText(), "unsent field is kept");
+    assertEquals("Bob", view.get("units").get("Equipment").get("firstAssignee").asText(), "unsent field is kept");
     assertEquals(5000, view.get("units").get("Services").get("humanReviewAbove").asLong(), "untouched unit keeps its threshold");
 
     JsonNode file = rulesFile();
     assertEquals(2, file.get("version").asInt());
     assertEquals(5000, file.get("businessUnits").get("Equipment").get("humanReviewAbove").asLong());
-    assertEquals("Alice", file.get("businessUnits").get("Equipment").get("firstAssignee").asText());
+    assertEquals("Bob", file.get("businessUnits").get("Equipment").get("firstAssignee").asText());
     assertEquals(5000, file.get("businessUnits").get("Services").get("humanReviewAbove").asLong(), "other units are kept");
   }
 
@@ -190,11 +190,11 @@ class WebServerTest {
     assertEquals(2, view.get("version").asInt());
     assertEquals("Carol", view.get("units").get("Services").get("firstAssignee").asText());
     assertEquals(5000, view.get("units").get("Services").get("humanReviewAbove").asLong(), "unsent field is kept");
-    assertEquals("Alice", view.get("units").get("Equipment").get("firstAssignee").asText());
+    assertEquals("Bob", view.get("units").get("Equipment").get("firstAssignee").asText());
 
     JsonNode file = rulesFile();
     assertEquals("Carol", file.get("businessUnits").get("Services").get("firstAssignee").asText());
-    assertEquals("Alice", file.get("businessUnits").get("Equipment").get("firstAssignee").asText());
+    assertEquals("Bob", file.get("businessUnits").get("Equipment").get("firstAssignee").asText());
   }
 
   @Test
