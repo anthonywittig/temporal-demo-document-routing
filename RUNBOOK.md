@@ -326,7 +326,7 @@ throw ApplicationFailure.newNonRetryableFailure(message, REJECTED);             
 [`DocumentRequestWorkflowImpl.java` lines 174–195](src/main/java/io/temporal/demo/docrouting/workflow/DocumentRequestWorkflowImpl.java#L174-L195):
 
 ```java
-Saga saga = new Saga(new Saga.Options.Builder().setParallelCompensation(false).build());
+Saga saga = new Saga(new Saga.Options.Builder().build());
 activities.reserveBudget(doc);
 saga.addCompensation(activities::releaseBudget, doc);   // more steps would register theirs here
 try { activities.sendPurchaseOrder(doc); }
