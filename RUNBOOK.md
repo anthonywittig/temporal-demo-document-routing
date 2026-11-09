@@ -105,7 +105,7 @@ Thirty-second version: "A document comes in, is classified, and business-unit ru
 
 ### 3. A person hands it on, and someone finishes it; the SLA runs out
 
-1. Under **Human tasks**, the Equipment request from beat 2 is assigned to **Bob**, with task ID `…-t1` under the document ID. Type `Alice` in its reassign box, add a comment, and click **Reassign**. A toast says "Reassign to Alice: recorded by Temporal". The row now shows **Alice**, task `…-t2`, and a fresh SLA countdown.
+1. Under **Human tasks**, the Equipment request from beat 2 is assigned to **Bob**. Type `Alice` in its reassign box, add a comment, and click **Reassign**. A toast says "Reassign to Alice: recorded by Temporal". The row now shows **Alice** and a fresh SLA countdown.
 2. Click **Waiting on Alice** under **Temporal UI views**. The request is in Alice's queue now. Say: "A person's queue is a visibility query on the `Assignee` search attribute. There's no inbox service to keep in sync, and it works with no worker running."
 3. On Alice's row, click **Complete**. A toast says "Completed by Alice: recorded by Temporal", and the row leaves the list. In **Recent requests** it shows path **HumanReview**, step **Completed**.
 4. Open it in the Temporal UI. After `EvaluateRules` (v1 → `HumanReview`), the history shows:
