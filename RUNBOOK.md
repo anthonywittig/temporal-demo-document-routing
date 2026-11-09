@@ -244,7 +244,7 @@ The rules file is read on every evaluation and validated, and the last good vers
 
 ### A human task: an Update with a validator
 
-[`DocumentRequestWorkflowImpl.java` lines 122–140](src/main/java/io/temporal/demo/docrouting/workflow/DocumentRequestWorkflowImpl.java#L122-L140):
+[`DocumentRequestWorkflowImpl.java` lines 121–139](src/main/java/io/temporal/demo/docrouting/workflow/DocumentRequestWorkflowImpl.java#L121-L139):
 
 ```java
 public void validateReview(ReviewDecision d) {
@@ -259,7 +259,7 @@ A rejected Update is never written to history. An accepted one carries the revie
 
 ### An SLA that flags without cancelling
 
-[`DocumentRequestWorkflowImpl.java` lines 104–115](src/main/java/io/temporal/demo/docrouting/workflow/DocumentRequestWorkflowImpl.java#L104-L115):
+[`DocumentRequestWorkflowImpl.java` lines 104–114](src/main/java/io/temporal/demo/docrouting/workflow/DocumentRequestWorkflowImpl.java#L104-L114):
 
 ```java
 CancellationScope sla = Workflow.newCancellationScope(() ->
