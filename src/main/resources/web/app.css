@@ -56,8 +56,14 @@ code, .mono { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-
 .banner { background: var(--warn-bg); color: var(--warn); padding: 8px 24px; border-bottom: 1px solid var(--border); }
 
 .layout { display: grid; grid-template-columns: minmax(280px, 1fr) minmax(0, 2.2fr); gap: 16px; padding: 16px 24px; }
-@media (max-width: 900px) { .layout { grid-template-columns: 1fr; padding: 16px; } }
 .column { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
+/* Single column on narrow screens: flatten both columns into one stack so the
+   Temporal UI views card can sit below the tables instead of above them. */
+@media (max-width: 900px) {
+  .layout { display: flex; flex-direction: column; padding: 16px; }
+  .column { display: contents; }
+  .views-card { order: 1; }
+}
 
 .card { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 16px; box-shadow: var(--shadow); overflow-x: auto; }
 .card-head { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
