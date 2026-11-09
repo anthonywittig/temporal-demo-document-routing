@@ -66,29 +66,19 @@ public class DocumentRequestWorkflowImpl implements DocumentRequestWorkflow {
 
     step(Steps.CLASSIFY);
     String docType = activities.classify(doc);
-    // Set once a reviewer approves the cost. Later evaluations still apply the rules in force
-    // then; the approval only counts if those rules would still send the cost to a person.
-    boolean costApproved = false;
+    boolean humanReviewApproved = false;
 
-    // At most two rounds: once the cost is approved the rules can't route back to HumanReview,
-    // because only the cost threshold leads there (RulesLoader.pathFor never picks it). The round
-    // number keeps each review task's ID unique, so a stale decision can't approve a later task.
     for (int round = 1; ; round++) {
       step(Steps.EVALUATE_RULES);
-      // Routing runs in an Activity: the rules are read from outside, and the decision (with
-      // the rules version that made it) is recorded in history. In-flight requests keep it.
-      RoutingDecision route = activities.evaluateRules(new EvaluateRulesInput(doc, docType, costApproved));
+      RoutingDecision route = activities.evaluateRules(new EvaluateRulesInput(doc, docType, humanReviewApproved));
       Workflow.upsertTypedSearchAttributes(
           PATH.valueSet(route.path().value()), RULES_VERSION.valueSet((long) route.rulesVersion()));
-      log.info("{} routed to path {} by rules v{}: {}", doc.documentId(), route.path(), route.rulesVersion(), route.reason());
 
       switch (route.path()) {
         case HUMAN_REVIEW -> {
           ReviewDecision review = humanTask(doc, route, round);
           if (review.action() == ReviewAction.APPROVE) {
-            // Back through the rules in force now. If they still need a review, this approval
-            // is it; if they no longer do, the request is routed by them alone.
-            costApproved = true;
+            humanReviewApproved = true;
             continue;
           }
           return rejectedByReviewer(doc, route, review);
@@ -110,7 +100,6 @@ public class DocumentRequestWorkflowImpl implements DocumentRequestWorkflow {
     decision = null;
     Instant deadline = Instant.ofEpochMilli(Workflow.currentTimeMillis()).plus(settings.slaDuration());
 
-    // The inbox reads these from visibility, so it works even when no worker is running.
     Map<String, Object> memo = new LinkedHashMap<>();
     memo.put("taskId", openTaskId);
     memo.put("slaDeadline", deadline.toString());
@@ -118,11 +107,9 @@ public class DocumentRequestWorkflowImpl implements DocumentRequestWorkflow {
     Workflow.upsertMemo(memo);
     Workflow.upsertTypedSearchAttributes(STEP.valueSet(Steps.HUMAN_TASK), SLA_BREACHED.valueSet(false));
 
-    // The SLA marks the task as breached but doesn't cancel it: a late decision still counts.
     CancellationScope sla = Workflow.newCancellationScope(() ->
         Workflow.newTimer(settings.slaDuration(), named("ReviewSla")).handle((ignored, canceled) -> {
           if (canceled == null) {
-            log.info("{} task {} breached its SLA", doc.documentId(), openTaskId);
             Workflow.upsertTypedSearchAttributes(SLA_BREACHED.valueSet(true));
           }
           return null;
@@ -187,13 +174,9 @@ public class DocumentRequestWorkflowImpl implements DocumentRequestWorkflow {
   // ---- PurchaseOrder: budget reservation, purchase order, compensation -------------------------
 
   private RequestOutcome purchaseOrder(DocumentRequest doc, RoutingDecision route) {
-    // Each side-effecting step registers its undo as soon as it has succeeded. There is one
-    // today; more steps would register theirs the same way and be undone in reverse order.
     Saga saga = new Saga(new Saga.Options.Builder().setParallelCompensation(false).build());
+
     step(Steps.RESERVE_BUDGET);
-    // A 422 here (unknown cost center) is non-retryable: nothing has been done yet, so there is
-    // nothing to undo. The Workflow fails at this step and waits for an operator to fix the data
-    // and reset it.
     activities.reserveBudget(doc);
     saga.addCompensation(activities::releaseBudget, doc);
 
@@ -202,7 +185,7 @@ public class DocumentRequestWorkflowImpl implements DocumentRequestWorkflow {
       activities.sendPurchaseOrder(doc);
     } catch (ActivityFailure e) {
       step(Steps.COMPENSATING);
-      saga.compensate(); // releases the budget reservation
+      saga.compensate();
       if (isRejection(e)) {
         step(Steps.REJECTED);
         return new RequestOutcome(RequestOutcome.REJECTED, route.path(), route.rulesVersion(),
