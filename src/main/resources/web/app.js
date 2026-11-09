@@ -134,7 +134,7 @@ function renderInbox(inbox) {
   }
   body.replaceChildren(...inbox.map((t) => {
     const comment = el("input", { class: "comment", placeholder: "comment (optional)" });
-    const to = el("input", { class: "assignee", placeholder: "Bob", size: 8, "aria-label": "Reassign to" });
+    const to = el("input", { class: "assignee", placeholder: "name", size: 8, "aria-label": "Reassign to" });
     const done = el("button", { class: "button small", title: "Finish the task; the request completes" }, "Complete");
     const hand = el("button", { class: "button small ghost", title: "Hand the task to the person named" }, "Reassign");
     done.addEventListener("click", () => complete(t, comment, [done, hand]));

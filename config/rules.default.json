@@ -7,7 +7,7 @@
     },
     "Equipment": {
       "humanReviewAbove": 1000,
-      "firstAssignee": "Alice"
+      "firstAssignee": "Bob"
     }
   }
 }
