@@ -61,12 +61,12 @@ public class DocumentRequestWorkflowImpl implements DocumentRequestWorkflow {
   public RequestOutcome process(DocumentRequest doc) {
     Workflow.upsertTypedSearchAttributes(BUSINESS_UNIT.valueSet(doc.businessUnit()));
 
-    step(Steps.CLASSIFY);
+    Workflow.upsertTypedSearchAttributes(STEP.valueSet(Steps.CLASSIFY));
     String docType = activities.classify(doc);
     boolean humanReviewApproved = false;
 
     for (int round = 1; ; round++) {
-      step(Steps.EVALUATE_RULES);
+      Workflow.upsertTypedSearchAttributes(STEP.valueSet(Steps.EVALUATE_RULES));
       RoutingDecision route = activities.evaluateRules(new EvaluateRulesInput(doc, docType, humanReviewApproved));
       Workflow.upsertTypedSearchAttributes(
           PATH.valueSet(route.path().value()), RULES_VERSION.valueSet((long) route.rulesVersion()));
@@ -141,7 +141,7 @@ public class DocumentRequestWorkflowImpl implements DocumentRequestWorkflow {
   /** The reviewer turned the request down: tell the requester and end, with nothing else to undo. */
   private RequestOutcome rejectedByReviewer(DocumentRequest doc, RoutingDecision route, ReviewDecision review) {
     activities.notifyRequester(new NotifyRequesterInput(doc, "rejected by " + review.reviewer()));
-    step(Steps.REJECTED);
+    Workflow.upsertTypedSearchAttributes(STEP.valueSet(Steps.REJECTED));
     return new RequestOutcome(RequestOutcome.REJECTED, route.path(), route.rulesVersion(),
         "Rejected by " + review.reviewer());
   }
@@ -149,16 +149,16 @@ public class DocumentRequestWorkflowImpl implements DocumentRequestWorkflow {
   // ---- Invoice: ERP posting, asynchronous confirmation, notification ------------------------
 
   private RequestOutcome invoice(DocumentRequest doc, RoutingDecision route) {
-    step(Steps.POST_TO_ERP);
+    Workflow.upsertTypedSearchAttributes(STEP.valueSet(Steps.POST_TO_ERP));
     activities.postInvoiceToErp(doc);
 
-    step(Steps.AWAIT_ERP_CONFIRMATION);
+    Workflow.upsertTypedSearchAttributes(STEP.valueSet(Steps.AWAIT_ERP_CONFIRMATION));
     if (!awaitWithTimer(settings.callbackTimeout(), "WaitForErpConfirmation", () -> erpConfirmation != null)) {
       throw ApplicationFailure.newNonRetryableFailure(
           "The ERP did not confirm the posting within " + settings.callbackTimeout(), "CallbackTimeout");
     }
 
-    step(Steps.NOTIFY);
+    Workflow.upsertTypedSearchAttributes(STEP.valueSet(Steps.NOTIFY));
     activities.notifyRequester(new NotifyRequesterInput(doc, "posted to the ERP, reference " + erpConfirmation.postingId()));
     return finish(doc, route, "Posted to the ERP, requester notified");
   }
@@ -173,18 +173,18 @@ public class DocumentRequestWorkflowImpl implements DocumentRequestWorkflow {
   private RequestOutcome purchaseOrder(DocumentRequest doc, RoutingDecision route) {
     Saga saga = new Saga(new Saga.Options.Builder().setParallelCompensation(false).build());
 
-    step(Steps.RESERVE_BUDGET);
+    Workflow.upsertTypedSearchAttributes(STEP.valueSet(Steps.RESERVE_BUDGET));
     activities.reserveBudget(doc);
     saga.addCompensation(activities::releaseBudget, doc);
 
-    step(Steps.SEND_PURCHASE_ORDER);
+    Workflow.upsertTypedSearchAttributes(STEP.valueSet(Steps.SEND_PURCHASE_ORDER));
     try {
       activities.sendPurchaseOrder(doc);
     } catch (ActivityFailure e) {
-      step(Steps.COMPENSATING);
+      Workflow.upsertTypedSearchAttributes(STEP.valueSet(Steps.COMPENSATING));
       saga.compensate();
       if (isRejection(e)) {
-        step(Steps.REJECTED);
+        Workflow.upsertTypedSearchAttributes(STEP.valueSet(Steps.REJECTED));
         return new RequestOutcome(RequestOutcome.REJECTED, route.path(), route.rulesVersion(),
             "The supplier portal rejected the purchase order; budget reservation released");
       }
@@ -198,10 +198,10 @@ public class DocumentRequestWorkflowImpl implements DocumentRequestWorkflow {
 
   private RequestOutcome finish(DocumentRequest doc, RoutingDecision route, String detail) {
     if (settings.archiveDocuments()) {
-      step(Steps.ARCHIVE);
+      Workflow.upsertTypedSearchAttributes(STEP.valueSet(Steps.ARCHIVE));
       activities.archiveDocument(doc);
     }
-    step(Steps.COMPLETED);
+    Workflow.upsertTypedSearchAttributes(STEP.valueSet(Steps.COMPLETED));
     return new RequestOutcome(RequestOutcome.COMPLETED, route.path(), route.rulesVersion(), detail);
   }
 
@@ -223,10 +223,6 @@ public class DocumentRequestWorkflowImpl implements DocumentRequestWorkflow {
 
   private static TimerOptions named(String summary) {
     return TimerOptions.newBuilder().setSummary(summary).build();
-  }
-
-  private static void step(String step) {
-    Workflow.upsertTypedSearchAttributes(STEP.valueSet(step));
   }
 
   private static boolean isRejection(ActivityFailure e) {

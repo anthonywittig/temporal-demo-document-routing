@@ -306,7 +306,7 @@ catch (ActivityFailure e) { saga.compensate(); ... }
 
 ### Progress you can search, and an inbox that needs no worker
 
-The workflow keeps `Step` current at every step ([`DocumentRequestWorkflowImpl.java` line 228](src/main/java/io/temporal/demo/docrouting/workflow/DocumentRequestWorkflowImpl.java#L228-L230)), and puts the task details in its memo ([line 104](src/main/java/io/temporal/demo/docrouting/workflow/DocumentRequestWorkflowImpl.java#L100-L104)). The inbox is a visibility query, not a Query, so it works with no worker running ([`WebServer.java` lines 242–249](src/main/java/io/temporal/demo/docrouting/web/WebServer.java#L242-L249)):
+The workflow upserts the `Step` search attribute at every step (the first is [`DocumentRequestWorkflowImpl.java` line 64](src/main/java/io/temporal/demo/docrouting/workflow/DocumentRequestWorkflowImpl.java#L64)), and puts the task details in its memo ([line 104](src/main/java/io/temporal/demo/docrouting/workflow/DocumentRequestWorkflowImpl.java#L100-L104)). The inbox is a visibility query, not a Query, so it works with no worker running ([`WebServer.java` lines 242–249](src/main/java/io/temporal/demo/docrouting/web/WebServer.java#L242-L249)):
 
 ```java
 client.listExecutions("WorkflowType=\"DocumentRequestWorkflow\" AND ExecutionStatus=\"Running\" AND Step=\"HumanTask\"")
