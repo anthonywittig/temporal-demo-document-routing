@@ -46,8 +46,8 @@ public class DocumentRequestWorkflowImpl implements DocumentRequestWorkflow {
       Workflow.newActivityStub(DocumentActivities.class, ACTIVITY_OPTIONS);
 
   // The open human task. The first goes to the assignee the rules named; each assignment is a new
-  // task ID. Complete or Reassign is accepted only for the open one, and the human-task loop acts
-  // on whichever arrives.
+  // task ID. Complete (an Update) is accepted only for the open one; Reassign (a Signal) is taken
+  // as sent. The human-task loop acts on whichever arrives.
   private String openTaskId;
   private String assignee;
   private boolean completed;
@@ -135,19 +135,9 @@ public class DocumentRequestWorkflowImpl implements DocumentRequestWorkflow {
   }
 
   @Override
-  public void validateReassign(ReassignTask action) {
-    requireOpenTask(action == null ? null : action.taskId());
-    if (action.assignee() == null || action.assignee().isBlank()) {
-      throw new IllegalArgumentException("Say who to reassign task " + action.taskId() + " to");
-    }
-  }
-
-  @Override
-  public TaskResult reassign(ReassignTask action) {
-    String taskId = openTaskId;
+  public void reassign(ReassignTask action) {
     openTaskId = null;
-    reassignTo = action.assignee().trim();
-    return new TaskResult(taskId, assignee + " reassigned it to " + reassignTo);
+    reassignTo = action.assignee();
   }
 
   private void requireOpenTask(String taskId) {
