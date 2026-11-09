@@ -12,7 +12,6 @@ import io.temporal.demo.docrouting.activities.NotifyRequesterInput;
 import io.temporal.demo.docrouting.model.DocumentRequest;
 import io.temporal.demo.docrouting.model.ErpConfirmation;
 import io.temporal.demo.docrouting.model.RequestOutcome;
-import io.temporal.demo.docrouting.model.ReviewAction;
 import io.temporal.demo.docrouting.model.ReviewDecision;
 import io.temporal.demo.docrouting.model.ReviewResult;
 import io.temporal.demo.docrouting.model.RoutingDecision;
@@ -115,7 +114,7 @@ public class DocumentRequestWorkflowImpl implements DocumentRequestWorkflow {
   }
 
   private boolean humanReviewApproved() {
-    return humanReviewDecision != null && humanReviewDecision.action() == ReviewAction.APPROVE;
+    return humanReviewDecision != null && humanReviewDecision.approved();
   }
 
   @Override
@@ -125,7 +124,6 @@ public class DocumentRequestWorkflowImpl implements DocumentRequestWorkflow {
           "Task " + (d == null ? "?" : d.taskId()) + " is no longer open"
               + (openTaskId == null ? "" : "; the open task is " + openTaskId));
     }
-    if (d.action() == null) throw new IllegalArgumentException("Choose APPROVE or REJECT");
     if (d.reviewer() == null || d.reviewer().isBlank()) throw new IllegalArgumentException("Reviewer is required");
   }
 
@@ -134,8 +132,8 @@ public class DocumentRequestWorkflowImpl implements DocumentRequestWorkflow {
     String taskId = openTaskId;
     humanReviewDecision = d;
     openTaskId = null;
-    return new ReviewResult(taskId, d.action(),
-        d.action() == ReviewAction.APPROVE ? "Approved by " + d.reviewer() : "Rejected by " + d.reviewer());
+    return new ReviewResult(taskId, d.approved(),
+        (d.approved() ? "Approved by " : "Rejected by ") + d.reviewer());
   }
 
   /** The reviewer turned the request down: tell the requester and end, with nothing else to undo. */
