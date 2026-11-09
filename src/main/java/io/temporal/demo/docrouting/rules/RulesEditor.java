@@ -35,17 +35,23 @@ public final class RulesEditor {
     this.loader = loader;
   }
 
+  /** One unit's edit from the rules card. A null field keeps what the rules in force have. */
+  public record UnitEdit(Long humanReviewAbove, String firstAssignee) {}
+
   /**
-   * Applies new human-review thresholds to the rules in force and saves them as the next version.
-   * Units not mentioned keep their threshold.
+   * Applies the edits to the rules in force and saves them as the next version. Units not
+   * mentioned, and fields left null, keep their values.
    */
-  public synchronized Rules saveThresholds(Map<String, Long> thresholds) {
+  public synchronized Rules saveUnits(Map<String, UnitEdit> edits) {
     Rules current = loader.current();
     Map<String, UnitRules> units = new LinkedHashMap<>(current.businessUnits());
-    thresholds.forEach((unit, threshold) -> {
-      if (!units.containsKey(unit)) throw new InvalidEditException("Unknown business unit " + unit);
-      if (threshold == null) throw new InvalidEditException(unit + " needs a threshold");
-      units.put(unit, new UnitRules(threshold));
+    edits.forEach((unit, edit) -> {
+      UnitRules was = units.get(unit);
+      if (was == null) throw new InvalidEditException("Unknown business unit " + unit);
+      if (edit == null) throw new InvalidEditException(unit + " has no changes");
+      units.put(unit, new UnitRules(
+          edit.humanReviewAbove() == null ? was.humanReviewAbove() : edit.humanReviewAbove(),
+          edit.firstAssignee() == null ? was.firstAssignee() : edit.firstAssignee().strip()));
     });
     Rules next = new Rules(current.version() + 1, units);
     List<String> problems = RulesLoader.validate(next);

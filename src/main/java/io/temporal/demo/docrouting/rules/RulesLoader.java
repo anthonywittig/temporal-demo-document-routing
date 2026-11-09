@@ -26,10 +26,11 @@ public final class RulesLoader {
       new ObjectMapper().enable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES);
 
   /**
-   * A unit's rules: the cost above which a person must review the request. Within it, the path
-   * follows from the document type alone ({@link #pathFor}).
+   * A unit's rules: the cost above which a person must review the request, and who gets that
+   * review first. Within the threshold, the path follows from the document type alone
+   * ({@link #pathFor}).
    */
-  public record UnitRules(long humanReviewAbove) {}
+  public record UnitRules(long humanReviewAbove, String firstAssignee) {}
 
   public record Rules(int version, Map<String, UnitRules> businessUnits) {}
 
@@ -91,7 +92,8 @@ public final class RulesLoader {
   }
 
   /**
-   * Cost above the unit's human-review threshold goes to a person (HumanReview); otherwise
+   * Cost above the unit's human-review threshold goes to a person (HumanReview), starting with the
+   * unit's first assignee; otherwise
    * invoices go to Invoice and purchase orders to PurchaseOrder. Any other document type is
    * refused, before it can reach a reviewer.
    */
@@ -104,13 +106,15 @@ public final class RulesLoader {
     if (cost > unit.humanReviewAbove()) {
       return new RoutingDecision(
           Route.HUMAN_REVIEW,
-          "%s: cost %d is above the human-review threshold %d".formatted(businessUnit, cost, unit.humanReviewAbove()),
-          rules.version());
+          "%s: cost %d is above the human-review threshold %d; first review goes to %s"
+              .formatted(businessUnit, cost, unit.humanReviewAbove(), unit.firstAssignee()),
+          rules.version(),
+          unit.firstAssignee());
     }
     String costNote = "cost %d is within %d".formatted(cost, unit.humanReviewAbove());
     String action = path == Route.PURCHASE_ORDER ? "go out as a purchase order" : "are posted to the ERP";
     return new RoutingDecision(
-        path, "%s: %s documents %s (%s)".formatted(businessUnit, docType, action, costNote), rules.version());
+        path, "%s: %s documents %s (%s)".formatted(businessUnit, docType, action, costNote), rules.version(), null);
   }
 
   /**
@@ -138,6 +142,11 @@ public final class RulesLoader {
         return;
       }
       if (unit.humanReviewAbove() < 0) problems.add(name + ".humanReviewAbove must not be negative");
+      if (unit.firstAssignee() == null || unit.firstAssignee().isBlank()) {
+        problems.add(name + ".firstAssignee is required");
+      } else if (!unit.firstAssignee().equals(unit.firstAssignee().strip())) {
+        problems.add(name + ".firstAssignee must not start or end with spaces");
+      }
     });
     return problems;
   }
