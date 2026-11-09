@@ -31,11 +31,12 @@ public class DocumentActivitiesImpl implements DocumentActivities {
   }
 
   @Override
-  public String classify(DocumentRequest doc) {
+  public ClassifyOutput classify(ClassifyInput input) {
     pause(); // to slow the demo down
     // A stand-in for a real classifier: the scenario carries its type.
+    DocumentRequest doc = input.doc();
     String type = doc.docType() == null || doc.docType().isBlank() ? "invoice" : doc.docType();
-    return type.toLowerCase();
+    return new ClassifyOutput(type.toLowerCase());
   }
 
   @Override
@@ -50,34 +51,42 @@ public class DocumentActivitiesImpl implements DocumentActivities {
   }
 
   @Override
-  public String postInvoiceToErp(DocumentRequest doc) {
-    return post("/erp/invoices", doc, Map.of("callbackUrl", webUrl + "/callbacks/erp"))
+  public PostInvoiceToErpOutput postInvoiceToErp(PostInvoiceToErpInput input) {
+    String postingId = post("/erp/invoices", input.doc(), Map.of("callbackUrl", webUrl + "/callbacks/erp"))
         .path("postingId").asText();
+    return new PostInvoiceToErpOutput(postingId);
   }
 
   @Override
-  public void notifyRequester(NotifyRequesterInput input) {
+  public NotifyRequesterOutput notifyRequester(NotifyRequesterInput input) {
     post("/notify", input.doc(), Map.of("detail", input.doc().requester() + ": " + input.message()));
+    return new NotifyRequesterOutput();
   }
 
   @Override
-  public void reserveBudget(DocumentRequest doc) {
+  public ReserveBudgetOutput reserveBudget(ReserveBudgetInput input) {
+    DocumentRequest doc = input.doc();
     post("/tasks/reserve-budget", doc, Map.of("detail", "$" + doc.cost() + " from " + doc.costCenter()));
+    return new ReserveBudgetOutput();
   }
 
   @Override
-  public void releaseBudget(DocumentRequest doc) {
+  public ReleaseBudgetOutput releaseBudget(ReleaseBudgetInput input) {
+    DocumentRequest doc = input.doc();
     post("/tasks/reserve-budget/undo", doc, Map.of("detail", "$" + doc.cost() + " to " + doc.costCenter()));
+    return new ReleaseBudgetOutput();
   }
 
   @Override
-  public void sendPurchaseOrder(DocumentRequest doc) {
-    post("/supplier-portal/purchase-orders", doc, Map.of());
+  public SendPurchaseOrderOutput sendPurchaseOrder(SendPurchaseOrderInput input) {
+    post("/supplier-portal/purchase-orders", input.doc(), Map.of());
+    return new SendPurchaseOrderOutput();
   }
 
   @Override
-  public void archiveDocument(DocumentRequest doc) {
-    post("/archive", doc, Map.of("detail", doc.documentId()));
+  public ArchiveDocumentOutput archiveDocument(ArchiveDocumentInput input) {
+    post("/archive", input.doc(), Map.of("detail", input.doc().documentId()));
+    return new ArchiveDocumentOutput();
   }
 
   private com.fasterxml.jackson.databind.JsonNode post(String path, DocumentRequest doc, Map<String, Object> extra) {

@@ -5,10 +5,16 @@ import static io.temporal.demo.docrouting.workflow.SearchAttrs.*;
 import io.temporal.activity.ActivityOptions;
 import io.temporal.common.RetryOptions;
 import io.temporal.common.VersioningBehavior;
+import io.temporal.demo.docrouting.activities.ArchiveDocumentInput;
+import io.temporal.demo.docrouting.activities.ClassifyInput;
 import io.temporal.demo.docrouting.activities.DocumentActivities;
 import io.temporal.demo.docrouting.activities.EvaluateRulesInput;
 import io.temporal.demo.docrouting.activities.HttpCalls;
 import io.temporal.demo.docrouting.activities.NotifyRequesterInput;
+import io.temporal.demo.docrouting.activities.PostInvoiceToErpInput;
+import io.temporal.demo.docrouting.activities.ReleaseBudgetInput;
+import io.temporal.demo.docrouting.activities.ReserveBudgetInput;
+import io.temporal.demo.docrouting.activities.SendPurchaseOrderInput;
 import io.temporal.demo.docrouting.model.CompleteTask;
 import io.temporal.demo.docrouting.model.DocumentRequest;
 import io.temporal.demo.docrouting.model.ErpConfirmation;
@@ -67,7 +73,7 @@ public class DocumentRequestWorkflowImpl implements DocumentRequestWorkflow {
         BUSINESS_UNIT.valueSet(doc.businessUnit()), COST.valueSet(doc.cost()), COST_CENTER.valueSet(doc.costCenter()));
 
     Workflow.upsertTypedSearchAttributes(STEP.valueSet(Steps.CLASSIFY));
-    String docType = activities.classify(doc);
+    String docType = activities.classify(new ClassifyInput(doc)).docType();
 
     Workflow.upsertTypedSearchAttributes(DOC_TYPE.valueSet(docType), STEP.valueSet(Steps.EVALUATE_RULES));
     RoutingDecision route = activities.evaluateRules(new EvaluateRulesInput(doc, docType));
@@ -161,7 +167,7 @@ public class DocumentRequestWorkflowImpl implements DocumentRequestWorkflow {
 
   private RequestOutcome invoice(DocumentRequest doc, RoutingDecision route) {
     Workflow.upsertTypedSearchAttributes(STEP.valueSet(Steps.POST_TO_ERP));
-    activities.postInvoiceToErp(doc);
+    activities.postInvoiceToErp(new PostInvoiceToErpInput(doc));
 
     Workflow.upsertTypedSearchAttributes(STEP.valueSet(Steps.AWAIT_ERP_CONFIRMATION));
     if (!awaitWithTimer(settings.callbackTimeout(), "WaitForErpConfirmation", () -> erpConfirmation != null)) {
@@ -185,12 +191,12 @@ public class DocumentRequestWorkflowImpl implements DocumentRequestWorkflow {
     Saga saga = new Saga(new Saga.Options.Builder().setParallelCompensation(false).build());
 
     Workflow.upsertTypedSearchAttributes(STEP.valueSet(Steps.RESERVE_BUDGET));
-    activities.reserveBudget(doc);
-    saga.addCompensation(activities::releaseBudget, doc);
+    activities.reserveBudget(new ReserveBudgetInput(doc));
+    saga.addCompensation(activities::releaseBudget, new ReleaseBudgetInput(doc));
 
     Workflow.upsertTypedSearchAttributes(STEP.valueSet(Steps.SEND_PURCHASE_ORDER));
     try {
-      activities.sendPurchaseOrder(doc);
+      activities.sendPurchaseOrder(new SendPurchaseOrderInput(doc));
     } catch (ActivityFailure e) {
       Workflow.upsertTypedSearchAttributes(STEP.valueSet(Steps.COMPENSATING));
       saga.compensate();
@@ -210,7 +216,7 @@ public class DocumentRequestWorkflowImpl implements DocumentRequestWorkflow {
   private RequestOutcome finish(DocumentRequest doc, RoutingDecision route, String detail) {
     if (settings.archiveDocuments()) {
       Workflow.upsertTypedSearchAttributes(STEP.valueSet(Steps.ARCHIVE));
-      activities.archiveDocument(doc);
+      activities.archiveDocument(new ArchiveDocumentInput(doc));
     }
     Workflow.upsertTypedSearchAttributes(STEP.valueSet(Steps.COMPLETED));
     return new RequestOutcome(RequestOutcome.COMPLETED, route.path(), route.rulesVersion(), detail);

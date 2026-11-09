@@ -71,7 +71,7 @@ class DocumentActivitiesTest {
 
   @Test
   void classifyAndRoute() {
-    String type = activities.classify(SERVICES_INVOICE);
+    String type = activities.classify(new ClassifyInput(SERVICES_INVOICE)).docType();
     assertEquals("invoice", type);
     var decision = activities.evaluateRules(new EvaluateRulesInput(SERVICES_INVOICE, type));
     assertEquals(Route.INVOICE, decision.path());
@@ -97,7 +97,7 @@ class DocumentActivitiesTest {
 
   @Test
   void erpPostingCallsBackToTheWebApp() throws Exception {
-    String postingId = activities.postInvoiceToErp(SERVICES_INVOICE);
+    String postingId = activities.postInvoiceToErp(new PostInvoiceToErpInput(SERVICES_INVOICE)).postingId();
     assertTrue(postingId.startsWith("ERP-"));
     JsonNode ack = callbacks.poll(5, TimeUnit.SECONDS);
     assertNotNull(ack);
@@ -106,7 +106,7 @@ class DocumentActivitiesTest {
 
   @Test
   void unknownCostCenterFailsWithoutRetry() {
-    var e = assertThrows(ActivityFailure.class, () -> activities.reserveBudget(BAD_CC));
+    var e = assertThrows(ActivityFailure.class, () -> activities.reserveBudget(new ReserveBudgetInput(BAD_CC)));
     var cause = (ApplicationFailure) e.getCause();
     assertEquals(HttpCalls.REJECTED, cause.getType());
     assertTrue(cause.isNonRetryable());
@@ -115,9 +115,9 @@ class DocumentActivitiesTest {
 
   @Test
   void sideEffectsAreSentWithStableIdempotencyKeys() throws Exception {
-    activities.reserveBudget(SERVICES_INVOICE);
-    activities.reserveBudget(SERVICES_INVOICE); // same workflow + activity type => same key
-    activities.releaseBudget(SERVICES_INVOICE);
+    activities.reserveBudget(new ReserveBudgetInput(SERVICES_INVOICE));
+    activities.reserveBudget(new ReserveBudgetInput(SERVICES_INVOICE)); // same workflow + activity type => same key
+    activities.releaseBudget(new ReleaseBudgetInput(SERVICES_INVOICE));
     activities.notifyRequester(new NotifyRequesterInput(SERVICES_INVOICE, "done"));
     JsonNode effects = effects();
     assertEquals(3, effects.size(), effects.toString());
