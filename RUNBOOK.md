@@ -4,7 +4,7 @@ This runbook is for presenting the demo. The [README](README.md) explains what i
 
 ## What it shows
 
-A document arrives, is classified, and business-unit rules route it down one of three paths: `HumanReview`, a human task; `Invoice`, an ERP posting with an asynchronous confirmation and a notification; or `PurchaseOrder`, a budget reservation against the PO's cost center and a purchase order sent to the supplier portal. Each document is one `DocumentRequestWorkflow`.
+A document arrives, is classified, and business-unit rules route it down one of two paths: `Invoice`, an ERP posting with an asynchronous confirmation and a notification; or `PurchaseOrder`, a budget reservation against the PO's cost center and a purchase order sent to the supplier portal. If the cost is above the unit's threshold, a person approves it first. Each document is one `DocumentRequestWorkflow`.
 
 The external systems:
 
@@ -21,7 +21,7 @@ During the talk you change the rules live, stop the worker and the external syst
 The demo makes five problems visible:
 
 - **Routing rules change more often than code.** Rules live in a JSON file outside the workflow. A change takes effect on the next request with no deploy, and each decision records the rules version that made it. Beats 2 and 3.
-- **People take time, and their decisions change the route.** The human task waits durably, with an SLA. A rejection ends the request; an approval re-evaluates it against the rules in force at that moment, and counts only if they still want a review. Beat 3.
+- **People take time, and their decisions gate the route.** The human task waits durably, with an SLA. A rejection ends the request; an approval lets it go on down the path the rules chose. Beat 3.
 - **External systems fail, slowly or for good.** Outages are retried with backoff. Rejections are not retried, and completed steps are undone in reverse. Beats 4 and 5.
 - **Bad data needs a fix and a replay, not a dead-letter queue.** Failed requests stay where they failed, searchable, and are replayed in bulk after the data is fixed. Beat 6.
 - **Shipping new code can't break requests in flight.** Each request is pinned to the worker version it started on, and old versions drain. Beat 7.
@@ -67,7 +67,7 @@ Open the **Temporal UI ↗** link in the second tab.
 
 Everything the page shows comes from Temporal's visibility store. The page keeps no state of its own. Click any document ID to open that request in the Temporal UI.
 
-Thirty-second version: "A document comes in, is classified, and business-unit rules send it to a person, post it to the ERP, or, for a purchase order, reserve the budget and send it to the supplier. Every document is a durable workflow. I'm going to change the rules while it runs, take the worker and the external systems away, break the data, and ship a new version, and you'll see nothing lost and nothing done twice."
+Thirty-second version: "A document comes in, is classified, and business-unit rules post it to the ERP or, for a purchase order, reserve the budget and send it to the supplier, with a person approving it first if the cost is high. Every document is a durable workflow. I'm going to change the rules while it runs, take the worker and the external systems away, break the data, and ship a new version, and you'll see nothing lost and nothing done twice."
 
 | Beat | Minutes | Compress if short on time |
 |---|---|---|
@@ -96,10 +96,10 @@ Thirty-second version: "A document comes in, is classified, and business-unit ru
 
 ### 2. Same cost, different unit; change a rule live
 
-1. Click **Equipment · invoice · $3,000**. It appears in the **Reviewer inbox** with the reason "Equipment: cost 3000 is above the human-review threshold 1000", rules **v1**, and an SLA countdown. **Leave it there**: it's the in-flight request for this beat and beat 3.
+1. Click **Equipment · invoice · $3,000**. It appears in the **Reviewer inbox** with the reason "Equipment: invoice documents are posted to the ERP after human review (cost 3000 is above 1000)", rules **v1**, and an SLA countdown. **Leave it there**: it's the in-flight request for this beat and beat 3.
 2. Say: "Same cost as the Services invoice, different business unit, different path. Each business unit has its own threshold. It comes from rules held outside the workflow, which stand in for Drools or any rules engine."
 3. In the **Routing rules** card, change Equipment to `5000` and click **Save as v2**. A toast says "Saved rules v2: the next evaluation uses them", and the card and the top bar show **rules v2**. (The card writes `data/rules.json`. Editing that file by hand does the same thing: set `"version": 2` and the Equipment `"humanReviewAbove"` to `5000`, and save.)
-4. Click **Equipment · invoice · $3,000** again. This time it goes straight to path **Invoice** and completes, with rules **v2** on its row.
+4. Click **Equipment · invoice · $3,000** again. This time it skips the inbox: under v2 it needs no review, and it completes on path **Invoice** with rules **v2** on its row.
 5. Point at the inbox. The first Equipment request is still waiting, still on rules **v1**.
 6. Say: "No deploy. The rules live outside the workflow, in a file this card writes, standing in for your rules engine and its admin screen. The next evaluation read the new version. The request already in flight keeps the decision it made, because that decision and its rules version are in its history. It won't silently change route under someone."
 7. Optional, to show validation: in the card, type `-5` for a threshold and save. The toast refuses it ("must not be negative"), and the version doesn't change. A broken hand edit to `data/rules.json` (delete a closing brace) is rejected too: the rules badge turns amber, and a banner says "rules.json edit rejected; still using v2". Rollback is the same move as a change: save the previous threshold, which becomes the next version.
@@ -107,8 +107,8 @@ Thirty-second version: "A document comes in, is classified, and business-unit ru
 ### 3. A person approves it; the SLA runs out
 
 1. In the inbox, on the Equipment request from beat 2, type a comment and click **Approve**. A toast says "Approved by Sam Chen: recorded by Temporal".
-2. The request goes back through the rules in force now, **v2**, carrying the approval. Under v2 the cost is within Equipment's new threshold, so the rules don't need a review any more and route it to `Invoice` on their own; it completes. Open it in the Temporal UI: there are two `EvaluateRules` results, v1 → `HumanReview` ("cost 3000 is above the human-review threshold 1000") and then v2 → `Invoice` ("cost 3000 is within 5000"), with the Update `Review` between them carrying the reviewer and the comment. Had v2 still put the cost above the threshold, the approval would have stood in for that review, and the reason would read "cost 3000 is above …, approved by a reviewer".
-3. Say: "Approval is a loop in code, not a special feature. The request re-runs the rules in force now. The approval only matters if those rules still want a person to look; if they don't, the new rules route it. It arrived under v1, and its second decision was made by v2. Whoever opens the history sees both decisions, which rules made each one, and who made the call in between."
+2. It goes on down `Invoice`, the path the rules chose when it arrived, and completes. Open it in the Temporal UI: one `EvaluateRules` result, v1 → `Invoice` with `humanReviewRequired: true` ("… after human review (cost 3000 is above 1000)"), then the Update `Review` carrying the reviewer and the comment, then `PostInvoiceToErp`. The rules are v2 now, and under v2 this cost wouldn't need a review, but the request isn't evaluated again.
+3. Say: "Approval is a gate in front of the path, not a new decision. The rules decided once, under v1, where this request goes and that a person must look first. The reviewer approved exactly that, and it went. A rule change doesn't reach back into requests already decided; the next request gets the new rules. Whoever opens the history sees the decision, the rules version that made it, and who approved it."
 4. Click **Services · invoice · $12,000**. It lands in the inbox (above the Services threshold of 5000). Click **Waiting on a person** under **Temporal UI views** to show the same list in the Temporal UI.
 5. Let the SLA run out while you talk (60 seconds by default). The row turns red with **SLA breached**. In the Temporal UI, **SLA breached** lists it, and the request's timeline shows the fired `ReviewSla` (1m) timer.
 6. Say: "The SLA is a durable timer. Breaching it flags the request; it doesn't cancel it. A late decision still counts. In production the flag is what you alert on."
@@ -232,19 +232,26 @@ Every side-effecting call also sends `Idempotency-Key: <workflowId>/<activity ty
 
 ### Routing runs in an Activity, and the decision is recorded
 
-[`DocumentRequestWorkflowImpl.java` lines 68–70](src/main/java/io/temporal/demo/docrouting/workflow/DocumentRequestWorkflowImpl.java#L68-L70):
+[`DocumentRequestWorkflowImpl.java` lines 67–76](src/main/java/io/temporal/demo/docrouting/workflow/DocumentRequestWorkflowImpl.java#L67-L76):
 
 ```java
-RoutingDecision route = activities.evaluateRules(new EvaluateRulesInput(doc, docType, humanReviewApproved()));
+RoutingDecision route = activities.evaluateRules(new EvaluateRulesInput(doc, docType));
 Workflow.upsertTypedSearchAttributes(
     PATH.valueSet(route.path().value()), RULES_VERSION.valueSet((long) route.rulesVersion()));
+
+if (route.humanReviewRequired()) {
+  humanReview(doc, route);
+  if (!humanReviewApproved()) {
+    return rejectedByReviewer(doc, route);
+  }
+}
 ```
 
-The rules file is read on every evaluation and validated, and the last good version is kept: [`RulesLoader.java` lines 62–82 and 93–142](src/main/java/io/temporal/demo/docrouting/rules/RulesLoader.java#L62-L142). Swap this class for a Drools or decision-table call and nothing else changes.
+The rules file is read on every evaluation and validated, and the last good version is kept: [`RulesLoader.java` lines 62–82 and 93–121](src/main/java/io/temporal/demo/docrouting/rules/RulesLoader.java#L62-L121). Swap this class for a Drools or decision-table call and nothing else changes.
 
 ### A human task: an Update with a validator
 
-[`DocumentRequestWorkflowImpl.java` lines 120–137](src/main/java/io/temporal/demo/docrouting/workflow/DocumentRequestWorkflowImpl.java#L120-L137):
+[`DocumentRequestWorkflowImpl.java` lines 115–132](src/main/java/io/temporal/demo/docrouting/workflow/DocumentRequestWorkflowImpl.java#L115-L132):
 
 ```java
 public void validateReview(ReviewDecision d) {
@@ -259,7 +266,7 @@ A rejected Update is never written to history. An accepted one carries the revie
 
 ### An SLA that flags without cancelling
 
-[`DocumentRequestWorkflowImpl.java` lines 103–113](src/main/java/io/temporal/demo/docrouting/workflow/DocumentRequestWorkflowImpl.java#L103-L113):
+[`DocumentRequestWorkflowImpl.java` lines 98–108](src/main/java/io/temporal/demo/docrouting/workflow/DocumentRequestWorkflowImpl.java#L98-L108):
 
 ```java
 CancellationScope sla = Workflow.newCancellationScope(() ->
@@ -274,7 +281,7 @@ sla.cancel();
 
 ### Turn a callback into a Signal
 
-The web app receives the ERP's confirmation callback and signals the workflow ([`WebServer.java` lines 206–222](src/main/java/io/temporal/demo/docrouting/web/WebServer.java#L206-L222)). The workflow waits with a deadline ([`DocumentRequestWorkflowImpl.java` lines 151–162](src/main/java/io/temporal/demo/docrouting/workflow/DocumentRequestWorkflowImpl.java#L151-L162)):
+The web app receives the ERP's confirmation callback and signals the workflow ([`WebServer.java` lines 206–222](src/main/java/io/temporal/demo/docrouting/web/WebServer.java#L206-L222)). The workflow waits with a deadline ([`DocumentRequestWorkflowImpl.java` lines 146–157](src/main/java/io/temporal/demo/docrouting/workflow/DocumentRequestWorkflowImpl.java#L146-L157)):
 
 ```java
 // a named timer, so the Temporal UI shows "WaitForErpConfirmation (2m)"
@@ -294,7 +301,7 @@ throw ApplicationFailure.newNonRetryableFailure(message, REJECTED);             
 
 ### Undo completed steps
 
-[`DocumentRequestWorkflowImpl.java` lines 173–193](src/main/java/io/temporal/demo/docrouting/workflow/DocumentRequestWorkflowImpl.java#L173-L193):
+[`DocumentRequestWorkflowImpl.java` lines 168–188](src/main/java/io/temporal/demo/docrouting/workflow/DocumentRequestWorkflowImpl.java#L168-L188):
 
 ```java
 Saga saga = new Saga(new Saga.Options.Builder().setParallelCompensation(false).build());
@@ -306,7 +313,7 @@ catch (ActivityFailure e) { saga.compensate(); ... }
 
 ### Progress you can search, and an inbox that needs no worker
 
-The workflow upserts the `Step` search attribute at every step (the first is [`DocumentRequestWorkflowImpl.java` line 63](src/main/java/io/temporal/demo/docrouting/workflow/DocumentRequestWorkflowImpl.java#L63)), and puts the task details in its memo ([line 100](src/main/java/io/temporal/demo/docrouting/workflow/DocumentRequestWorkflowImpl.java#L96-L100)). The inbox is a visibility query, not a Query, so it works with no worker running ([`WebServer.java` lines 236–243](src/main/java/io/temporal/demo/docrouting/web/WebServer.java#L236-L243)):
+The workflow upserts the `Step` search attribute at every step (the first is [`DocumentRequestWorkflowImpl.java` line 63](src/main/java/io/temporal/demo/docrouting/workflow/DocumentRequestWorkflowImpl.java#L63)), and puts the task details in its memo ([line 95](src/main/java/io/temporal/demo/docrouting/workflow/DocumentRequestWorkflowImpl.java#L91-L95)). The inbox is a visibility query, not a Query, so it works with no worker running ([`WebServer.java` lines 236–243](src/main/java/io/temporal/demo/docrouting/web/WebServer.java#L236-L243)):
 
 ```java
 client.listExecutions("WorkflowType=\"DocumentRequestWorkflow\" AND ExecutionStatus=\"Running\" AND Step=\"HumanTask\"")

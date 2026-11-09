@@ -82,22 +82,22 @@ class HistoryReplayTest {
   @EnabledIfSystemProperty(named = "record", matches = "true")
   void recordFixtures() throws Exception {
     Files.createDirectories(FIXTURES);
-    record("v1-human-review.json", Route.HUMAN_REVIEW, false, (wf, client) -> {
+    record("v1-human-review.json", "rec-humanreview", Route.INVOICE, true, false, (wf, client) -> {
       awaitStep(wf, Steps.HUMAN_TASK);
-      wf.review(new ReviewDecision("rec-humanreview-r1", false, "Sam", "recorded"));
+      wf.review(new ReviewDecision("rec-humanreview-review", false, "Sam", "recorded"));
     });
-    record("v1-invoice.json", Route.INVOICE, false, (wf, client) -> {
+    record("v1-invoice.json", "rec-invoice", Route.INVOICE, false, false, (wf, client) -> {
       awaitStep(wf, Steps.AWAIT_ERP_CONFIRMATION);
       wf.erpPostingConfirmed(new ErpConfirmation("ERP-rec", "now"));
     });
-    record("v1-purchase-order-rejected.json", Route.PURCHASE_ORDER, true, (wf, client) -> {});
+    record("v1-purchase-order-rejected.json", "rec-purchaseorder", Route.PURCHASE_ORDER, false, true, (wf, client) -> {});
   }
 
   interface Drive {
     void run(DocumentRequestWorkflow wf, WorkflowClient client) throws Exception;
   }
 
-  private void record(String file, Route route, boolean supplierRejects, Drive drive) throws Exception {
+  private void record(String file, String id, Route route, boolean review, boolean supplierRejects, Drive drive) throws Exception {
     // A fixed identity, so the committed histories don't carry the recording machine's host name.
     var options = TestEnvironmentOptions.newBuilder()
         .setWorkflowClientOptions(WorkflowClientOptions.newBuilder().setIdentity("replay-fixture-recorder").build())
@@ -108,7 +108,7 @@ class HistoryReplayTest {
       }
       env.registerSearchAttribute("SlaBreached", IndexedValueType.INDEXED_VALUE_TYPE_BOOL);
       env.registerSearchAttribute("RulesVersion", IndexedValueType.INDEXED_VALUE_TYPE_INT);
-      FakeActivities fake = new FakeActivities().route(route, 1);
+      FakeActivities fake = review ? new FakeActivities().reviewThen(route, 1) : new FakeActivities().route(route, 1);
       fake.supplierRejects = supplierRejects;
       Worker worker = env.newWorker(QUEUE);
       worker.registerWorkflowImplementationFactory(
@@ -116,7 +116,6 @@ class HistoryReplayTest {
       worker.registerActivitiesImplementations(fake);
       env.start();
 
-      String id = "rec-" + route.value().toLowerCase();
       WorkflowClient client = env.getWorkflowClient();
       DocumentRequestWorkflow wf = client.newWorkflowStub(DocumentRequestWorkflow.class,
           WorkflowOptions.newBuilder().setTaskQueue(QUEUE).setWorkflowId(DocumentRequestWorkflow.workflowId(id)).build());

@@ -1,8 +1,7 @@
 # Document routing — a Temporal demo
 
-A document arrives, is classified, and business-unit rules route it down one of three paths:
+A document arrives, is classified, and business-unit rules route it down one of two paths. If its cost is above the unit's human-review threshold, a reviewer sees it first: a rejection ends the request, and an approval lets it continue down the path the rules chose.
 
-- **`HumanReview`.** A reviewer rejects the request, which ends it, or approves its cost, which sends it back through the rules in force now, so it continues down `Invoice` or `PurchaseOrder`. The approval only counts if those rules still put the cost above the threshold; if a rule change has since brought the cost within it, the request is routed by the new rules alone.
 - **`Invoice`.** The invoice is posted to the ERP, which confirms the posting asynchronously, and the requester is notified.
 - **`PurchaseOrder`.** Budget is reserved against the purchase order's cost center, which fails without retrying if the cost center is unknown, and the PO is sent to the supplier portal. If the supplier rejects it, the budget reservation is released.
 

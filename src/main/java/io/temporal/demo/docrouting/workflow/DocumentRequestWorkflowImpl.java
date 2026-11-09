@@ -63,33 +63,28 @@ public class DocumentRequestWorkflowImpl implements DocumentRequestWorkflow {
     Workflow.upsertTypedSearchAttributes(STEP.valueSet(Steps.CLASSIFY));
     String docType = activities.classify(doc);
 
-    for (int round = 1; ; round++) {
-      Workflow.upsertTypedSearchAttributes(STEP.valueSet(Steps.EVALUATE_RULES));
-      RoutingDecision route = activities.evaluateRules(new EvaluateRulesInput(doc, docType, humanReviewApproved()));
-      Workflow.upsertTypedSearchAttributes(
-          PATH.valueSet(route.path().value()), RULES_VERSION.valueSet((long) route.rulesVersion()));
+    Workflow.upsertTypedSearchAttributes(STEP.valueSet(Steps.EVALUATE_RULES));
+    RoutingDecision route = activities.evaluateRules(new EvaluateRulesInput(doc, docType));
+    Workflow.upsertTypedSearchAttributes(
+        PATH.valueSet(route.path().value()), RULES_VERSION.valueSet((long) route.rulesVersion()));
 
-      switch (route.path()) {
-        case HUMAN_REVIEW -> {
-          humanReview(doc, route, round);
-          if (!humanReviewApproved()) {
-            return rejectedByReviewer(doc, route);
-          }
-        }
-        case INVOICE -> {
-          return invoice(doc, route);
-        }
-        case PURCHASE_ORDER -> {
-          return purchaseOrder(doc, route);
-        }
+    if (route.humanReviewRequired()) {
+      humanReview(doc, route);
+      if (!humanReviewApproved()) {
+        return rejectedByReviewer(doc, route);
       }
     }
+
+    return switch (route.path()) {
+      case INVOICE -> invoice(doc, route);
+      case PURCHASE_ORDER -> purchaseOrder(doc, route);
+    };
   }
 
-  // ---- HumanReview: a person approves or rejects the cost -----------------------------------
+  // ---- Human review: a person approves or rejects the cost ----------------------------------
 
-  private void humanReview(DocumentRequest doc, RoutingDecision route, int round) {
-    openTaskId = doc.documentId() + "-r" + round;
+  private void humanReview(DocumentRequest doc, RoutingDecision route) {
+    openTaskId = doc.documentId() + "-review";
     humanReviewDecision = null;
     Instant deadline = Instant.ofEpochMilli(Workflow.currentTimeMillis()).plus(settings.slaDuration());
 

@@ -19,13 +19,17 @@ import java.util.concurrent.CopyOnWriteArrayList;
 public class FakeActivities implements DocumentActivities {
   public final List<String> calls = new CopyOnWriteArrayList<>();
   final Deque<RoutingDecision> decisions = new ArrayDeque<>();
-  /** The costApproved flag passed to each evaluateRules call, in order. */
-  public final List<Boolean> costApprovedFlags = new CopyOnWriteArrayList<>();
   volatile boolean costCenterUnknown;
   volatile boolean supplierRejects;
 
   public FakeActivities route(Route path, int version) {
-    decisions.add(new RoutingDecision(path, "test routes to " + path, version));
+    decisions.add(new RoutingDecision(path, false, "test routes to " + path, version));
+    return this;
+  }
+
+  /** As {@link #route}, but a person must approve the cost first. */
+  public FakeActivities reviewThen(Route path, int version) {
+    decisions.add(new RoutingDecision(path, true, "test reviews, then routes to " + path, version));
     return this;
   }
 
@@ -46,7 +50,6 @@ public class FakeActivities implements DocumentActivities {
   @Override
   public synchronized RoutingDecision evaluateRules(EvaluateRulesInput input) {
     record();
-    costApprovedFlags.add(input.costApproved());
     // The last scripted decision repeats once the script runs out.
     return decisions.size() > 1 ? decisions.poll() : decisions.peek();
   }

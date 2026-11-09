@@ -25,7 +25,7 @@ public interface DocumentRequestWorkflow {
   @WorkflowMethod
   RequestOutcome process(DocumentRequest doc);
 
-  /** HumanReview: a reviewer approves or rejects the open task. Refused if the task isn't open. */
+  /** Human review: a reviewer approves or rejects the open task. Refused if the task isn't open. */
   @UpdateMethod(name = "Review")
   ReviewResult review(ReviewDecision decision);
 

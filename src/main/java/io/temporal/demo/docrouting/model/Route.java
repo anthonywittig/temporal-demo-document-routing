@@ -4,12 +4,11 @@ import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonValue;
 
 /**
- * The three processing paths. Each is written as its {@link #value()} wherever people see it: the
- * {@code Path} search attribute and Workflow payloads.
+ * The two processing paths. Each is written as its {@link #value()} wherever people see it: the
+ * {@code Path} search attribute and Workflow payloads. Human review isn't a path: it's a gate the
+ * rules can put in front of either one ({@link RoutingDecision#humanReviewRequired()}).
  */
 public enum Route {
-  /** A reviewer rejects the request, or approves its cost and sends it on through the rules. */
-  HUMAN_REVIEW("HumanReview"),
   /** The invoice is posted to the ERP, which confirms asynchronously, then the requester is notified. */
   INVOICE("Invoice"),
   /** Budget is reserved against the cost center, then the purchase order is sent to the supplier portal. */

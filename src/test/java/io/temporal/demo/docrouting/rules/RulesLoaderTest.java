@@ -36,27 +36,25 @@ class RulesLoaderTest {
   }
 
   @Test
-  void sameCostRoutesDifferentlyPerBusinessUnit() {
+  void sameCostIsReviewedInOneUnitButNotTheOther() {
     var services = loader.evaluate("Services", "invoice", 3000);
     var equipment = loader.evaluate("Equipment", "invoice", 3000);
     assertEquals(Route.INVOICE, services.path());
-    assertEquals(Route.HUMAN_REVIEW, equipment.path());
+    assertFalse(services.humanReviewRequired());
+    assertEquals(Route.INVOICE, equipment.path());
+    assertTrue(equipment.humanReviewRequired());
     assertEquals(1, services.rulesVersion());
-    assertTrue(equipment.reason().contains("1000"), equipment.reason());
+    assertEquals("Equipment: invoice documents are posted to the ERP after human review (cost 3000 is above 1000)",
+        equipment.reason());
   }
 
   @Test
-  void eachPath() {
-    assertEquals(Route.HUMAN_REVIEW, loader.evaluate("Services", "invoice", 12000).path());
-    assertEquals(Route.INVOICE, loader.evaluate("Services", "invoice", 300).path());
-    assertEquals(Route.PURCHASE_ORDER, loader.evaluate("Equipment", "purchase-order", 800).path());
-  }
-
-  @Test
-  void documentTypeAloneChoosesBetweenInvoiceAndPurchaseOrder() {
+  void documentTypeAloneChoosesThePath() {
     for (String unit : new String[] {"Services", "Equipment"}) {
-      assertEquals(Route.PURCHASE_ORDER, loader.evaluate(unit, "purchase-order", 500).path(), unit);
-      assertEquals(Route.INVOICE, loader.evaluate(unit, "invoice", 500).path(), unit);
+      for (long cost : new long[] {500, 12000}) {
+        assertEquals(Route.PURCHASE_ORDER, loader.evaluate(unit, "purchase-order", cost).path(), unit + " " + cost);
+        assertEquals(Route.INVOICE, loader.evaluate(unit, "invoice", cost).path(), unit + " " + cost);
+      }
     }
     var po = loader.evaluate("Equipment", "purchase-order", 800);
     assertEquals("Equipment: purchase-order documents go out as a purchase order (cost 800 is within 1000)", po.reason());
@@ -65,34 +63,10 @@ class RulesLoaderTest {
   }
 
   @Test
-  void approvalStandsInForTheReviewTheCurrentRulesNeed() {
-    var approvedInvoice = loader.evaluate("Services", "invoice", 12000, true);
-    assertEquals(Route.INVOICE, approvedInvoice.path());
-    assertEquals(
-        "Services: invoice documents are posted to the ERP (cost 12000 is above 5000, approved by a reviewer)",
-        approvedInvoice.reason());
-    assertEquals(Route.PURCHASE_ORDER, loader.evaluate("Equipment", "purchase-order", 12000, true).path());
-    assertEquals(Route.HUMAN_REVIEW, loader.evaluate("Services", "invoice", 12000, false).path());
-  }
-
-  @Test
-  void approvalIsIgnoredWhenTheCurrentRulesNoLongerNeedAReview() throws IOException {
-    // Approved under v1 (Equipment threshold 1000); v2 raises the threshold above the cost.
-    Files.writeString(file, V1.replace("\"version\": 1", "\"version\": 2").replace("1000", "5000"));
-    var decision = loader.evaluate("Equipment", "invoice", 3000, true);
-    assertEquals(Route.INVOICE, decision.path());
-    assertEquals(2, decision.rulesVersion());
-    assertEquals("Equipment: invoice documents are posted to the ERP (cost 3000 is within 5000)", decision.reason());
-  }
-
-  @Test
-  void approvalStillCountsWhenTheCurrentRulesStillNeedAReview() throws IOException {
-    // Approved under v1 (Equipment threshold 1000); v2 changes the threshold but not the answer.
-    Files.writeString(file, V1.replace("\"version\": 1", "\"version\": 2").replace("1000", "2000"));
-    var decision = loader.evaluate("Equipment", "invoice", 3000, true);
-    assertEquals(Route.INVOICE, decision.path());
-    assertEquals(2, decision.rulesVersion());
-    assertTrue(decision.reason().contains("above 2000, approved by a reviewer"), decision.reason());
+  void costAboveTheThresholdRequiresHumanReview() {
+    assertTrue(loader.evaluate("Services", "invoice", 12000).humanReviewRequired());
+    assertTrue(loader.evaluate("Equipment", "purchase-order", 1001).humanReviewRequired());
+    assertFalse(loader.evaluate("Equipment", "purchase-order", 1000).humanReviewRequired(), "at the threshold is within it");
   }
 
   @Test
@@ -103,10 +77,11 @@ class RulesLoaderTest {
 
   @Test
   void liveEditTakesEffectOnNextEvaluation() throws IOException {
-    assertEquals(Route.INVOICE, loader.evaluate("Services", "invoice", 3000).path());
+    assertFalse(loader.evaluate("Services", "invoice", 3000).humanReviewRequired());
     Files.writeString(file, V1.replace("\"version\": 1", "\"version\": 2").replace("5000", "2000"));
     var decision = loader.evaluate("Services", "invoice", 3000);
-    assertEquals(Route.HUMAN_REVIEW, decision.path());
+    assertEquals(Route.INVOICE, decision.path());
+    assertTrue(decision.humanReviewRequired());
     assertEquals(2, decision.rulesVersion());
   }
 
