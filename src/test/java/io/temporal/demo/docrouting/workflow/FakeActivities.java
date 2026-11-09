@@ -22,8 +22,13 @@ public class FakeActivities implements DocumentActivities {
   volatile boolean costCenterUnknown;
   volatile boolean supplierRejects;
 
+  /** Routes as the rules would; a HumanReview task goes first to Alice. */
   public FakeActivities route(Route path, int version) {
-    decision = (new RoutingDecision(path, "test routes to " + path, version));
+    return route(path, version, path == Route.HUMAN_REVIEW ? "Alice" : null);
+  }
+
+  public FakeActivities route(Route path, int version, String assignee) {
+    decision = new RoutingDecision(path, "test routes to " + path, version, assignee);
     return this;
   }
 

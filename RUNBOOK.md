@@ -57,7 +57,7 @@ Keep a third terminal free for beat 6's reset command and beat 7's second worker
 A healthy start shows the following on http://localhost:8080:
 - the top bar shows **rules v1** and `task queue · document-routing`;
 - five document chips;
-- the **Routing rules** card shows **v1**, with Services at 5000 and Equipment at 1000;
+- the **Routing rules** card shows **v1**, with Services at 5000 and Equipment at 1000, both with first assignee Alice;
 - **ERP is up** and **Supplier portal accepts purchase orders**;
 - an empty **Human tasks** list ("No open tasks.") and an empty **Recent requests** list.
 
@@ -96,8 +96,8 @@ Thirty-second version: "A document comes in, is classified, and business-unit ru
 
 ### 2. Same cost, different unit; change a rule live
 
-1. Click **Equipment · invoice · $3,000**. It appears under **Human tasks**, assigned to **Alice**, with rules **v1** and an SLA countdown. Its `EvaluateRules` result in the Temporal UI gives the reason: "Equipment: cost 3000 is above the human-review threshold 1000". **Leave it there**: it's the in-flight request for this beat and beat 3.
-2. Say: "Same cost as the Services invoice, different business unit, different path. Each business unit has its own threshold. It comes from rules held outside the workflow, which stand in for Drools or any rules engine."
+1. Click **Equipment · invoice · $3,000**. It appears under **Human tasks**, assigned to **Alice**, with rules **v1** and an SLA countdown. Its `EvaluateRules` result in the Temporal UI gives the reason: "Equipment: cost 3000 is above the human-review threshold 1000; first review goes to Alice". **Leave it there**: it's the in-flight request for this beat and beat 3.
+2. Say: "Same cost as the Services invoice, different business unit, different path. Each business unit has its own threshold, and its own first reviewer. They come from rules held outside the workflow, which stand in for Drools or any rules engine."
 3. In the **Routing rules** card, change Equipment to `5000` and click **Save as v2**. A toast says "Saved rules v2: the next evaluation uses them", and the card and the top bar show **rules v2**. (The card writes `data/rules.json`. Editing that file by hand does the same thing: set `"version": 2` and the Equipment `"humanReviewAbove"` to `5000`, and save.)
 4. Click **Equipment · invoice · $3,000** again. This time it goes straight to path **Invoice** and completes, with rules **v2** on its row.
 5. Point at the inbox. The first Equipment request is still waiting, still on rules **v1**.
@@ -124,7 +124,7 @@ Thirty-second version: "A document comes in, is classified, and business-unit ru
 
    There's no ERP posting: the person's decision is the end of this path.
 6. Say: "The human task is the path. The workflow waited durably for a person, seconds here and days in production, and each hand-off is in the history: who had it, who it went to, and who finished it. Each assignment has its own SLA, so a breach means the person holding it now is late."
-7. Click **Services · invoice · $12,000**. It lands under **Human tasks**, assigned to Alice (above the Services threshold of 5000). Click **Waiting on a person** under **Temporal UI views** to show the same list in the Temporal UI.
+7. Optional, to show that who gets the work is a rule too: in the **Routing rules** card, set Services' **First assignee** to `Carol` and click **Save**. Then click **Services · invoice · $12,000**. It lands under **Human tasks**, assigned to Alice (Carol if you made the change), above the Services threshold of 5000. Click **Waiting on a person** under **Temporal UI views** to show the same list in the Temporal UI.
 8. Let the SLA run out while you talk (60 seconds by default). The row turns red with **SLA breached**. In the Temporal UI, **SLA breached** lists it, and the request's timeline shows the fired `ReviewSla` (1m) timer.
 9. Say: "The SLA is a durable timer. Breaching it flags the request; it doesn't cancel it. The task can still be completed, or reassigned, which starts a new SLA for the next person. In production the flag is what you alert on."
 10. **Don't complete or reassign this one.** It's the open v1 request for beat 7.
@@ -233,7 +233,7 @@ Links are relative to this directory and point at line ranges. They are not pinn
 
 ### One execution per document
 
-[`DocumentRequestWorkflow.java` lines 22–24](src/main/java/io/temporal/demo/docrouting/workflow/DocumentRequestWorkflow.java#L22-L24) and [`WebServer.java` lines 140 and 155](src/main/java/io/temporal/demo/docrouting/web/WebServer.java#L135-L160):
+[`DocumentRequestWorkflow.java` lines 22–24](src/main/java/io/temporal/demo/docrouting/workflow/DocumentRequestWorkflow.java#L22-L24) and [`WebServer.java` lines 141 and 156](src/main/java/io/temporal/demo/docrouting/web/WebServer.java#L136-L161):
 
 ```java
 static String workflowId(String documentId) { return "doc-" + documentId; }
@@ -255,14 +255,14 @@ Workflow.upsertTypedSearchAttributes(
     PATH.valueSet(route.path().value()), RULES_VERSION.valueSet((long) route.rulesVersion()));
 ```
 
-The rules file is read on every evaluation and validated, and the last good version is kept: [`RulesLoader.java` lines 62–82 and 92–143](src/main/java/io/temporal/demo/docrouting/rules/RulesLoader.java#L62-L143). Swap this class for a Drools or decision-table call and nothing else changes.
+The rules file is read on every evaluation and validated, and the last good version is kept: [`RulesLoader.java` lines 63–83 and 93–152](src/main/java/io/temporal/demo/docrouting/rules/RulesLoader.java#L63-L152). Swap this class for a Drools or decision-table call and nothing else changes.
 
 ### A human task: Updates with validators
 
 Each assignment is a task with its own ID. The workflow waits until whoever holds it completes it or hands it on ([`DocumentRequestWorkflowImpl.java` lines 86–96](src/main/java/io/temporal/demo/docrouting/workflow/DocumentRequestWorkflowImpl.java#L86-L96)):
 
 ```java
-assignee = FIRST_ASSIGNEE;                       // "Alice"
+assignee = route.assignee();                     // the unit's firstAssignee in rules.json
 for (int n = 1; !completed; n++) {
   humanTask(doc.documentId() + "-t" + n);        // opens the task, starts its SLA, waits
   if (reassignTo != null) assignee = reassignTo;
@@ -299,7 +299,7 @@ sla.cancel();
 
 ### Turn a callback into a Signal
 
-The web app receives the ERP's confirmation callback and signals the workflow ([`WebServer.java` lines 213–229](src/main/java/io/temporal/demo/docrouting/web/WebServer.java#L213-L229)). The workflow waits with a deadline ([`DocumentRequestWorkflowImpl.java` lines 162–175](src/main/java/io/temporal/demo/docrouting/workflow/DocumentRequestWorkflowImpl.java#L162-L175)):
+The web app receives the ERP's confirmation callback and signals the workflow ([`WebServer.java` lines 214–230](src/main/java/io/temporal/demo/docrouting/web/WebServer.java#L214-L230)). The workflow waits with a deadline ([`DocumentRequestWorkflowImpl.java` lines 162–175](src/main/java/io/temporal/demo/docrouting/workflow/DocumentRequestWorkflowImpl.java#L162-L175)):
 
 ```java
 // a named timer, so the Temporal UI shows "WaitForErpConfirmation (2m)"
@@ -333,7 +333,7 @@ catch (ActivityFailure e) { saga.compensate(); ... }
 
 The workflow upserts the `Step` search attribute at every step (the first is [`DocumentRequestWorkflowImpl.java` line 69](src/main/java/io/temporal/demo/docrouting/workflow/DocumentRequestWorkflowImpl.java#L69)), and keeps everything the inbox shows in search attributes too: `Cost` and `CostCenter` at the start, `DocType` after `Classify`, and `Assignee`, `TaskId` and `SlaDeadline` for each task ([lines 66–72 and 104–109](src/main/java/io/temporal/demo/docrouting/workflow/DocumentRequestWorkflowImpl.java#L66-L109)). There's no memo, so every column is also a filter in the Temporal UI, such as `Step="HumanTask" AND Assignee="Alice"`.
 
-The inbox is a visibility query, not a Query, so it works with no worker running ([`WebServer.java` lines 243–250](src/main/java/io/temporal/demo/docrouting/web/WebServer.java#L243-L250)):
+The inbox is a visibility query, not a Query, so it works with no worker running ([`WebServer.java` lines 244–251](src/main/java/io/temporal/demo/docrouting/web/WebServer.java#L244-L251)):
 
 ```java
 client.listExecutions("WorkflowType=\"DocumentRequestWorkflow\" AND ExecutionStatus=\"Running\" AND Step=\"HumanTask\"")
