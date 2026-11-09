@@ -2,7 +2,7 @@
   "events": [
     {
       "eventId": "1",
-      "eventTime": "2026-11-09T22:47:06.257Z",
+      "eventTime": "2026-11-09T22:52:54.484Z",
       "eventType": "EVENT_TYPE_WORKFLOW_EXECUTION_STARTED",
       "workflowExecutionStartedEventAttributes": {
         "workflowType": {
@@ -24,9 +24,9 @@
         "workflowExecutionTimeout": "315360000s",
         "workflowRunTimeout": "315360000s",
         "workflowTaskTimeout": "10s",
-        "originalExecutionRunId": "8c389fea-6a50-435b-a618-5ef0cfbb1a0e",
+        "originalExecutionRunId": "b6a861e2-137c-4d0d-8c85-494d786f53df",
         "identity": "replay-fixture-recorder",
-        "firstExecutionRunId": "8c389fea-6a50-435b-a618-5ef0cfbb1a0e",
+        "firstExecutionRunId": "b6a861e2-137c-4d0d-8c85-494d786f53df",
         "attempt": 1,
         "firstWorkflowTaskBackoff": "0s",
         "header": {}
@@ -34,7 +34,7 @@
     },
     {
       "eventId": "2",
-      "eventTime": "2026-11-09T22:47:06.257Z",
+      "eventTime": "2026-11-09T22:52:54.484Z",
       "eventType": "EVENT_TYPE_WORKFLOW_TASK_SCHEDULED",
       "workflowTaskScheduledEventAttributes": {
         "taskQueue": {
@@ -46,17 +46,17 @@
     },
     {
       "eventId": "3",
-      "eventTime": "2026-11-09T22:47:06.258Z",
+      "eventTime": "2026-11-09T22:52:54.485Z",
       "eventType": "EVENT_TYPE_WORKFLOW_TASK_STARTED",
       "workflowTaskStartedEventAttributes": {
         "scheduledEventId": "2",
         "identity": "replay-fixture-recorder",
-        "historySizeBytes": "401"
+        "historySizeBytes": "403"
       }
     },
     {
       "eventId": "4",
-      "eventTime": "2026-11-09T22:47:06.261Z",
+      "eventTime": "2026-11-09T22:52:54.490Z",
       "eventType": "EVENT_TYPE_WORKFLOW_TASK_COMPLETED",
       "workflowTaskCompletedEventAttributes": {
         "scheduledEventId": "2",
@@ -74,7 +74,7 @@
     },
     {
       "eventId": "5",
-      "eventTime": "2026-11-09T22:47:06.261Z",
+      "eventTime": "2026-11-09T22:52:54.490Z",
       "eventType": "EVENT_TYPE_UPSERT_WORKFLOW_SEARCH_ATTRIBUTES",
       "upsertWorkflowSearchAttributesEventAttributes": {
         "workflowTaskCompletedEventId": "3",
@@ -107,7 +107,7 @@
     },
     {
       "eventId": "6",
-      "eventTime": "2026-11-09T22:47:06.261Z",
+      "eventTime": "2026-11-09T22:52:54.490Z",
       "eventType": "EVENT_TYPE_UPSERT_WORKFLOW_SEARCH_ATTRIBUTES",
       "upsertWorkflowSearchAttributesEventAttributes": {
         "workflowTaskCompletedEventId": "3",
@@ -126,10 +126,10 @@
     },
     {
       "eventId": "7",
-      "eventTime": "2026-11-09T22:47:06.261Z",
+      "eventTime": "2026-11-09T22:52:54.490Z",
       "eventType": "EVENT_TYPE_ACTIVITY_TASK_SCHEDULED",
       "activityTaskScheduledEventAttributes": {
-        "activityId": "2c7ecc82-8ef6-3621-953d-e0afc1be14f1",
+        "activityId": "b4bd7a7c-950f-3287-bd07-5ddc8a30a903",
         "activityType": {
           "name": "Classify"
         },
@@ -162,7 +162,7 @@
     },
     {
       "eventId": "8",
-      "eventTime": "2026-11-09T22:47:06.261Z",
+      "eventTime": "2026-11-09T22:52:54.491Z",
       "eventType": "EVENT_TYPE_ACTIVITY_TASK_STARTED",
       "activityTaskStartedEventAttributes": {
         "scheduledEventId": "7",
@@ -172,7 +172,7 @@
     },
     {
       "eventId": "9",
-      "eventTime": "2026-11-09T22:47:06.262Z",
+      "eventTime": "2026-11-09T22:52:54.492Z",
       "eventType": "EVENT_TYPE_ACTIVITY_TASK_COMPLETED",
       "activityTaskCompletedEventAttributes": {
         "result": {
@@ -192,7 +192,7 @@
     },
     {
       "eventId": "10",
-      "eventTime": "2026-11-09T22:47:06.262Z",
+      "eventTime": "2026-11-09T22:52:54.492Z",
       "eventType": "EVENT_TYPE_WORKFLOW_TASK_SCHEDULED",
       "workflowTaskScheduledEventAttributes": {
         "taskQueue": {
@@ -204,17 +204,17 @@
     },
     {
       "eventId": "11",
-      "eventTime": "2026-11-09T22:47:06.263Z",
+      "eventTime": "2026-11-09T22:52:54.492Z",
       "eventType": "EVENT_TYPE_WORKFLOW_TASK_STARTED",
       "workflowTaskStartedEventAttributes": {
         "scheduledEventId": "10",
         "identity": "replay-fixture-recorder",
-        "historySizeBytes": "1326"
+        "historySizeBytes": "1336"
       }
     },
     {
       "eventId": "12",
-      "eventTime": "2026-11-09T22:47:06.265Z",
+      "eventTime": "2026-11-09T22:52:54.495Z",
       "eventType": "EVENT_TYPE_WORKFLOW_TASK_COMPLETED",
       "workflowTaskCompletedEventAttributes": {
         "scheduledEventId": "10",
@@ -228,7 +228,7 @@
     },
     {
       "eventId": "13",
-      "eventTime": "2026-11-09T22:47:06.265Z",
+      "eventTime": "2026-11-09T22:52:54.495Z",
       "eventType": "EVENT_TYPE_UPSERT_WORKFLOW_SEARCH_ATTRIBUTES",
       "upsertWorkflowSearchAttributesEventAttributes": {
         "workflowTaskCompletedEventId": "11",
@@ -254,10 +254,10 @@
     },
     {
       "eventId": "14",
-      "eventTime": "2026-11-09T22:47:06.265Z",
+      "eventTime": "2026-11-09T22:52:54.495Z",
       "eventType": "EVENT_TYPE_ACTIVITY_TASK_SCHEDULED",
       "activityTaskScheduledEventAttributes": {
-        "activityId": "55f0dde4-e640-3eb0-b943-b9c64b7f2cff",
+        "activityId": "cc0991a5-7ad0-33e5-b21e-2bbb2c58ab23",
         "activityType": {
           "name": "EvaluateRules"
         },
@@ -290,7 +290,7 @@
     },
     {
       "eventId": "15",
-      "eventTime": "2026-11-09T22:47:06.265Z",
+      "eventTime": "2026-11-09T22:52:54.495Z",
       "eventType": "EVENT_TYPE_ACTIVITY_TASK_STARTED",
       "activityTaskStartedEventAttributes": {
         "scheduledEventId": "14",
@@ -300,7 +300,7 @@
     },
     {
       "eventId": "16",
-      "eventTime": "2026-11-09T22:47:06.266Z",
+      "eventTime": "2026-11-09T22:52:54.496Z",
       "eventType": "EVENT_TYPE_ACTIVITY_TASK_COMPLETED",
       "activityTaskCompletedEventAttributes": {
         "result": {
@@ -320,7 +320,7 @@
     },
     {
       "eventId": "17",
-      "eventTime": "2026-11-09T22:47:06.266Z",
+      "eventTime": "2026-11-09T22:52:54.496Z",
       "eventType": "EVENT_TYPE_WORKFLOW_TASK_SCHEDULED",
       "workflowTaskScheduledEventAttributes": {
         "taskQueue": {
@@ -332,17 +332,17 @@
     },
     {
       "eventId": "18",
-      "eventTime": "2026-11-09T22:47:06.266Z",
+      "eventTime": "2026-11-09T22:52:54.496Z",
       "eventType": "EVENT_TYPE_WORKFLOW_TASK_STARTED",
       "workflowTaskStartedEventAttributes": {
         "scheduledEventId": "17",
         "identity": "replay-fixture-recorder",
-        "historySizeBytes": "2208"
+        "historySizeBytes": "2225"
       }
     },
     {
       "eventId": "19",
-      "eventTime": "2026-11-09T22:47:06.268Z",
+      "eventTime": "2026-11-09T22:52:54.499Z",
       "eventType": "EVENT_TYPE_WORKFLOW_TASK_COMPLETED",
       "workflowTaskCompletedEventAttributes": {
         "scheduledEventId": "17",
@@ -356,7 +356,7 @@
     },
     {
       "eventId": "20",
-      "eventTime": "2026-11-09T22:47:06.268Z",
+      "eventTime": "2026-11-09T22:52:54.499Z",
       "eventType": "EVENT_TYPE_UPSERT_WORKFLOW_SEARCH_ATTRIBUTES",
       "upsertWorkflowSearchAttributesEventAttributes": {
         "workflowTaskCompletedEventId": "18",
@@ -382,7 +382,7 @@
     },
     {
       "eventId": "21",
-      "eventTime": "2026-11-09T22:47:06.268Z",
+      "eventTime": "2026-11-09T22:52:54.499Z",
       "eventType": "EVENT_TYPE_UPSERT_WORKFLOW_SEARCH_ATTRIBUTES",
       "upsertWorkflowSearchAttributesEventAttributes": {
         "workflowTaskCompletedEventId": "18",
@@ -401,10 +401,10 @@
     },
     {
       "eventId": "22",
-      "eventTime": "2026-11-09T22:47:06.268Z",
+      "eventTime": "2026-11-09T22:52:54.499Z",
       "eventType": "EVENT_TYPE_ACTIVITY_TASK_SCHEDULED",
       "activityTaskScheduledEventAttributes": {
-        "activityId": "d5346c24-c255-3806-9f04-a688b499416f",
+        "activityId": "5566a32a-5b75-319d-aca4-769904ccc4e6",
         "activityType": {
           "name": "PostInvoiceToErp"
         },
@@ -437,7 +437,7 @@
     },
     {
       "eventId": "23",
-      "eventTime": "2026-11-09T22:47:06.269Z",
+      "eventTime": "2026-11-09T22:52:54.499Z",
       "eventType": "EVENT_TYPE_ACTIVITY_TASK_STARTED",
       "activityTaskStartedEventAttributes": {
         "scheduledEventId": "22",
@@ -447,7 +447,7 @@
     },
     {
       "eventId": "24",
-      "eventTime": "2026-11-09T22:47:06.270Z",
+      "eventTime": "2026-11-09T22:52:54.500Z",
       "eventType": "EVENT_TYPE_ACTIVITY_TASK_COMPLETED",
       "activityTaskCompletedEventAttributes": {
         "result": {
@@ -467,7 +467,7 @@
     },
     {
       "eventId": "25",
-      "eventTime": "2026-11-09T22:47:06.270Z",
+      "eventTime": "2026-11-09T22:52:54.500Z",
       "eventType": "EVENT_TYPE_WORKFLOW_TASK_SCHEDULED",
       "workflowTaskScheduledEventAttributes": {
         "taskQueue": {
@@ -479,17 +479,17 @@
     },
     {
       "eventId": "26",
-      "eventTime": "2026-11-09T22:47:06.270Z",
+      "eventTime": "2026-11-09T22:52:54.500Z",
       "eventType": "EVENT_TYPE_WORKFLOW_TASK_STARTED",
       "workflowTaskStartedEventAttributes": {
         "scheduledEventId": "25",
         "identity": "replay-fixture-recorder",
-        "historySizeBytes": "3063"
+        "historySizeBytes": "3085"
       }
     },
     {
       "eventId": "27",
-      "eventTime": "2026-11-09T22:47:06.273Z",
+      "eventTime": "2026-11-09T22:52:54.503Z",
       "eventType": "EVENT_TYPE_WORKFLOW_TASK_COMPLETED",
       "workflowTaskCompletedEventAttributes": {
         "scheduledEventId": "25",
@@ -503,7 +503,7 @@
     },
     {
       "eventId": "28",
-      "eventTime": "2026-11-09T22:47:06.273Z",
+      "eventTime": "2026-11-09T22:52:54.503Z",
       "eventType": "EVENT_TYPE_UPSERT_WORKFLOW_SEARCH_ATTRIBUTES",
       "upsertWorkflowSearchAttributesEventAttributes": {
         "workflowTaskCompletedEventId": "26",
@@ -522,10 +522,10 @@
     },
     {
       "eventId": "29",
-      "eventTime": "2026-11-09T22:47:06.273Z",
+      "eventTime": "2026-11-09T22:52:54.503Z",
       "eventType": "EVENT_TYPE_TIMER_STARTED",
       "timerStartedEventAttributes": {
-        "timerId": "f4a8d8e3-7332-385c-8b7a-1ff8f24f0989",
+        "timerId": "1ed7a9be-1086-32a3-84f7-e14da039770c",
         "startToFireTimeout": "120s",
         "workflowTaskCompletedEventId": "26"
       },
@@ -540,7 +540,7 @@
     },
     {
       "eventId": "30",
-      "eventTime": "2026-11-09T22:47:06.317Z",
+      "eventTime": "2026-11-09T22:52:54.548Z",
       "eventType": "EVENT_TYPE_WORKFLOW_EXECUTION_SIGNALED",
       "workflowExecutionSignaledEventAttributes": {
         "signalName": "ErpPostingConfirmed",
@@ -560,7 +560,7 @@
     },
     {
       "eventId": "31",
-      "eventTime": "2026-11-09T22:47:06.317Z",
+      "eventTime": "2026-11-09T22:52:54.548Z",
       "eventType": "EVENT_TYPE_WORKFLOW_TASK_SCHEDULED",
       "workflowTaskScheduledEventAttributes": {
         "taskQueue": {
@@ -572,17 +572,17 @@
     },
     {
       "eventId": "32",
-      "eventTime": "2026-11-09T22:47:06.318Z",
+      "eventTime": "2026-11-09T22:52:54.548Z",
       "eventType": "EVENT_TYPE_WORKFLOW_TASK_STARTED",
       "workflowTaskStartedEventAttributes": {
         "scheduledEventId": "31",
         "identity": "replay-fixture-recorder",
-        "historySizeBytes": "3591"
+        "historySizeBytes": "3613"
       }
     },
     {
       "eventId": "33",
-      "eventTime": "2026-11-09T22:47:06.322Z",
+      "eventTime": "2026-11-09T22:52:54.552Z",
       "eventType": "EVENT_TYPE_WORKFLOW_TASK_COMPLETED",
       "workflowTaskCompletedEventAttributes": {
         "scheduledEventId": "31",
@@ -596,17 +596,17 @@
     },
     {
       "eventId": "34",
-      "eventTime": "2026-11-09T22:47:06.322Z",
+      "eventTime": "2026-11-09T22:52:54.552Z",
       "eventType": "EVENT_TYPE_TIMER_CANCELED",
       "timerCanceledEventAttributes": {
-        "timerId": "f4a8d8e3-7332-385c-8b7a-1ff8f24f0989",
+        "timerId": "1ed7a9be-1086-32a3-84f7-e14da039770c",
         "startedEventId": "29",
         "workflowTaskCompletedEventId": "32"
       }
     },
     {
       "eventId": "35",
-      "eventTime": "2026-11-09T22:47:06.322Z",
+      "eventTime": "2026-11-09T22:52:54.552Z",
       "eventType": "EVENT_TYPE_UPSERT_WORKFLOW_SEARCH_ATTRIBUTES",
       "upsertWorkflowSearchAttributesEventAttributes": {
         "workflowTaskCompletedEventId": "32",
@@ -625,10 +625,10 @@
     },
     {
       "eventId": "36",
-      "eventTime": "2026-11-09T22:47:06.322Z",
+      "eventTime": "2026-11-09T22:52:54.552Z",
       "eventType": "EVENT_TYPE_ACTIVITY_TASK_SCHEDULED",
       "activityTaskScheduledEventAttributes": {
-        "activityId": "06103fc3-1147-354d-a0f3-a395540b5d13",
+        "activityId": "b881dfa4-54a2-344f-a80d-1b17db7c7c4f",
         "activityType": {
           "name": "NotifyRequester"
         },
@@ -661,7 +661,7 @@
     },
     {
       "eventId": "37",
-      "eventTime": "2026-11-09T22:47:06.322Z",
+      "eventTime": "2026-11-09T22:52:54.553Z",
       "eventType": "EVENT_TYPE_ACTIVITY_TASK_STARTED",
       "activityTaskStartedEventAttributes": {
         "scheduledEventId": "36",
@@ -671,19 +671,10 @@
     },
     {
       "eventId": "38",
-      "eventTime": "2026-11-09T22:47:06.323Z",
+      "eventTime": "2026-11-09T22:52:54.554Z",
       "eventType": "EVENT_TYPE_ACTIVITY_TASK_COMPLETED",
       "activityTaskCompletedEventAttributes": {
-        "result": {
-          "payloads": [
-            {
-              "metadata": {
-                "encoding": "anNvbi9wbGFpbg\u003d\u003d"
-              },
-              "data": "e30\u003d"
-            }
-          ]
-        },
+        "result": {},
         "scheduledEventId": "36",
         "startedEventId": "37",
         "identity": "replay-fixture-recorder"
@@ -691,7 +682,7 @@
     },
     {
       "eventId": "39",
-      "eventTime": "2026-11-09T22:47:06.323Z",
+      "eventTime": "2026-11-09T22:52:54.554Z",
       "eventType": "EVENT_TYPE_WORKFLOW_TASK_SCHEDULED",
       "workflowTaskScheduledEventAttributes": {
         "taskQueue": {
@@ -703,17 +694,17 @@
     },
     {
       "eventId": "40",
-      "eventTime": "2026-11-09T22:47:06.323Z",
+      "eventTime": "2026-11-09T22:52:54.554Z",
       "eventType": "EVENT_TYPE_WORKFLOW_TASK_STARTED",
       "workflowTaskStartedEventAttributes": {
         "scheduledEventId": "39",
         "identity": "replay-fixture-recorder",
-        "historySizeBytes": "4411"
+        "historySizeBytes": "4403"
       }
     },
     {
       "eventId": "41",
-      "eventTime": "2026-11-09T22:47:06.324Z",
+      "eventTime": "2026-11-09T22:52:54.555Z",
       "eventType": "EVENT_TYPE_WORKFLOW_TASK_COMPLETED",
       "workflowTaskCompletedEventAttributes": {
         "scheduledEventId": "39",
@@ -727,7 +718,7 @@
     },
     {
       "eventId": "42",
-      "eventTime": "2026-11-09T22:47:06.324Z",
+      "eventTime": "2026-11-09T22:52:54.555Z",
       "eventType": "EVENT_TYPE_UPSERT_WORKFLOW_SEARCH_ATTRIBUTES",
       "upsertWorkflowSearchAttributesEventAttributes": {
         "workflowTaskCompletedEventId": "40",
@@ -746,7 +737,7 @@
     },
     {
       "eventId": "43",
-      "eventTime": "2026-11-09T22:47:06.324Z",
+      "eventTime": "2026-11-09T22:52:54.555Z",
       "eventType": "EVENT_TYPE_WORKFLOW_EXECUTION_COMPLETED",
       "workflowExecutionCompletedEventAttributes": {
         "result": {
