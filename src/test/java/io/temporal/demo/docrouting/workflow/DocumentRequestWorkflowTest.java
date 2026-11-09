@@ -14,7 +14,6 @@ import io.temporal.common.converter.DefaultDataConverter;
 import io.temporal.demo.docrouting.model.DocumentRequest;
 import io.temporal.demo.docrouting.model.ErpConfirmation;
 import io.temporal.demo.docrouting.model.RequestOutcome;
-import io.temporal.demo.docrouting.model.ReviewAction;
 import io.temporal.demo.docrouting.model.ReviewDecision;
 import io.temporal.demo.docrouting.model.ReviewResult;
 import io.temporal.demo.docrouting.model.Route;
@@ -195,7 +194,7 @@ class DocumentRequestWorkflowTest {
     fake.route(Route.HUMAN_REVIEW, 1);
     var wf = begin(doc("a1", "Equipment", "invoice", 3000));
     awaitStep(wf, Steps.HUMAN_TASK);
-    ReviewResult r = wf.review(new ReviewDecision("a1-r1", ReviewAction.REJECT, "Sam", "not in budget"));
+    ReviewResult r = wf.review(new ReviewDecision("a1-r1", false, "Sam", "not in budget"));
     assertEquals("a1-r1", r.taskId());
     assertEquals("Rejected by Sam", r.message());
     RequestOutcome outcome = result(wf);
@@ -212,7 +211,7 @@ class DocumentRequestWorkflowTest {
     fake.route(Route.HUMAN_REVIEW, 1).route(Route.INVOICE, 2); // the rules change while the task is open
     var wf = begin(doc("a2", "Equipment", "invoice", 3000));
     awaitStep(wf, Steps.HUMAN_TASK);
-    ReviewResult r = wf.review(new ReviewDecision("a2-r1", ReviewAction.APPROVE, "Sam", "worth it"));
+    ReviewResult r = wf.review(new ReviewDecision("a2-r1", true, "Sam", "worth it"));
     assertEquals("Approved by Sam", r.message());
     awaitStep(wf, Steps.AWAIT_ERP_CONFIRMATION);
     wf.erpPostingConfirmed(new ErpConfirmation("A-test", "now"));
@@ -229,7 +228,7 @@ class DocumentRequestWorkflowTest {
     fake.route(Route.HUMAN_REVIEW, 1).route(Route.PURCHASE_ORDER, 1);
     var wf = begin(doc("a5", "Equipment", "purchase-order", 3000));
     awaitStep(wf, Steps.HUMAN_TASK);
-    wf.review(new ReviewDecision("a5-r1", ReviewAction.APPROVE, "Sam", ""));
+    wf.review(new ReviewDecision("a5-r1", true, "Sam", ""));
     RequestOutcome outcome = result(wf);
     assertEquals(RequestOutcome.COMPLETED, outcome.status());
     assertEquals(Route.PURCHASE_ORDER, outcome.path());
@@ -245,14 +244,14 @@ class DocumentRequestWorkflowTest {
     awaitStep(wf, Steps.HUMAN_TASK);
 
     var wrong = assertThrows(WorkflowUpdateException.class,
-        () -> wf.review(new ReviewDecision("nope", ReviewAction.REJECT, "Sam", "")));
+        () -> wf.review(new ReviewDecision("nope", false, "Sam", "")));
     assertTrue(wrong.getCause().getMessage().contains("no longer open"), wrong.getCause().getMessage());
 
-    wf.review(new ReviewDecision("a3-r1", ReviewAction.APPROVE, "Sam", ""));
+    wf.review(new ReviewDecision("a3-r1", true, "Sam", ""));
     awaitStep(wf, Steps.HUMAN_TASK); // the scripted rules route it to a person again
     // A second click on the first task, after it was approved, is stale.
     var stale = assertThrows(WorkflowUpdateException.class,
-        () -> wf.review(new ReviewDecision("a3-r1", ReviewAction.REJECT, "Sam", "")));
+        () -> wf.review(new ReviewDecision("a3-r1", false, "Sam", "")));
     assertTrue(stale.getCause().getMessage().contains("a3-r2"), stale.getCause().getMessage());
 
     long updatesInHistory = client.fetchHistory(DocumentRequestWorkflow.workflowId("a3")).getEvents().stream()
@@ -269,7 +268,7 @@ class DocumentRequestWorkflowTest {
     env.sleep(SLA.plusSeconds(5));
     assertEquals(true, describe(wf).getTypedSearchAttributes().get(SearchAttrs.SLA_BREACHED));
     assertEquals(Steps.HUMAN_TASK, step(wf));
-    wf.review(new ReviewDecision("a4-r1", ReviewAction.REJECT, "Sam", "late, and no"));
+    wf.review(new ReviewDecision("a4-r1", false, "Sam", "late, and no"));
     assertEquals(RequestOutcome.REJECTED, result(wf).status());
   }
 

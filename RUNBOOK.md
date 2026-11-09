@@ -218,7 +218,7 @@ Links are relative to this directory and point at line ranges. They are not pinn
 
 ### One execution per document
 
-[`DocumentRequestWorkflow.java` lines 21–23](src/main/java/io/temporal/demo/docrouting/workflow/DocumentRequestWorkflow.java#L21-L23) and [`WebServer.java` lines 137 and 155](src/main/java/io/temporal/demo/docrouting/web/WebServer.java#L133-L160):
+[`DocumentRequestWorkflow.java` lines 21–23](src/main/java/io/temporal/demo/docrouting/workflow/DocumentRequestWorkflow.java#L21-L23) and [`WebServer.java` lines 136 and 154](src/main/java/io/temporal/demo/docrouting/web/WebServer.java#L132-L159):
 
 ```java
 static String workflowId(String documentId) { return "doc-" + documentId; }
@@ -232,7 +232,7 @@ Every side-effecting call also sends `Idempotency-Key: <workflowId>/<activity ty
 
 ### Routing runs in an Activity, and the decision is recorded
 
-[`DocumentRequestWorkflowImpl.java` lines 69–71](src/main/java/io/temporal/demo/docrouting/workflow/DocumentRequestWorkflowImpl.java#L69-L71):
+[`DocumentRequestWorkflowImpl.java` lines 68–70](src/main/java/io/temporal/demo/docrouting/workflow/DocumentRequestWorkflowImpl.java#L68-L70):
 
 ```java
 RoutingDecision route = activities.evaluateRules(new EvaluateRulesInput(doc, docType, humanReviewApproved()));
@@ -244,7 +244,7 @@ The rules file is read on every evaluation and validated, and the last good vers
 
 ### A human task: an Update with a validator
 
-[`DocumentRequestWorkflowImpl.java` lines 121–139](src/main/java/io/temporal/demo/docrouting/workflow/DocumentRequestWorkflowImpl.java#L121-L139):
+[`DocumentRequestWorkflowImpl.java` lines 120–137](src/main/java/io/temporal/demo/docrouting/workflow/DocumentRequestWorkflowImpl.java#L120-L137):
 
 ```java
 public void validateReview(ReviewDecision d) {
@@ -259,7 +259,7 @@ A rejected Update is never written to history. An accepted one carries the revie
 
 ### An SLA that flags without cancelling
 
-[`DocumentRequestWorkflowImpl.java` lines 104–114](src/main/java/io/temporal/demo/docrouting/workflow/DocumentRequestWorkflowImpl.java#L104-L114):
+[`DocumentRequestWorkflowImpl.java` lines 103–113](src/main/java/io/temporal/demo/docrouting/workflow/DocumentRequestWorkflowImpl.java#L103-L113):
 
 ```java
 CancellationScope sla = Workflow.newCancellationScope(() ->
@@ -274,7 +274,7 @@ sla.cancel();
 
 ### Turn a callback into a Signal
 
-The web app receives the ERP's confirmation callback and signals the workflow ([`WebServer.java` lines 210–226](src/main/java/io/temporal/demo/docrouting/web/WebServer.java#L210-L226)). The workflow waits with a deadline ([`DocumentRequestWorkflowImpl.java` lines 153–164](src/main/java/io/temporal/demo/docrouting/workflow/DocumentRequestWorkflowImpl.java#L153-L164)):
+The web app receives the ERP's confirmation callback and signals the workflow ([`WebServer.java` lines 206–222](src/main/java/io/temporal/demo/docrouting/web/WebServer.java#L206-L222)). The workflow waits with a deadline ([`DocumentRequestWorkflowImpl.java` lines 151–162](src/main/java/io/temporal/demo/docrouting/workflow/DocumentRequestWorkflowImpl.java#L151-L162)):
 
 ```java
 // a named timer, so the Temporal UI shows "WaitForErpConfirmation (2m)"
@@ -285,7 +285,7 @@ if (!awaitWithTimer(settings.callbackTimeout(), "WaitForErpConfirmation", () -> 
 
 ### Let the failure decide whether to retry
 
-[`HttpCalls.java` lines 51–60](src/main/java/io/temporal/demo/docrouting/activities/HttpCalls.java#L51-L60), with the policy in [`DocumentRequestWorkflowImpl.java` lines 35–42](src/main/java/io/temporal/demo/docrouting/workflow/DocumentRequestWorkflowImpl.java#L35-L42):
+[`HttpCalls.java` lines 51–60](src/main/java/io/temporal/demo/docrouting/activities/HttpCalls.java#L51-L60), with the policy in [`DocumentRequestWorkflowImpl.java` lines 34–41](src/main/java/io/temporal/demo/docrouting/workflow/DocumentRequestWorkflowImpl.java#L34-L41):
 
 ```java
 if (isRetryable(status)) throw ApplicationFailure.newFailure(message, TRANSIENT);   // 5xx, 408, 429
@@ -294,7 +294,7 @@ throw ApplicationFailure.newNonRetryableFailure(message, REJECTED);             
 
 ### Undo completed steps
 
-[`DocumentRequestWorkflowImpl.java` lines 175–195](src/main/java/io/temporal/demo/docrouting/workflow/DocumentRequestWorkflowImpl.java#L175-L195):
+[`DocumentRequestWorkflowImpl.java` lines 173–193](src/main/java/io/temporal/demo/docrouting/workflow/DocumentRequestWorkflowImpl.java#L173-L193):
 
 ```java
 Saga saga = new Saga(new Saga.Options.Builder().setParallelCompensation(false).build());
@@ -306,7 +306,7 @@ catch (ActivityFailure e) { saga.compensate(); ... }
 
 ### Progress you can search, and an inbox that needs no worker
 
-The workflow upserts the `Step` search attribute at every step (the first is [`DocumentRequestWorkflowImpl.java` line 64](src/main/java/io/temporal/demo/docrouting/workflow/DocumentRequestWorkflowImpl.java#L64)), and puts the task details in its memo ([line 101](src/main/java/io/temporal/demo/docrouting/workflow/DocumentRequestWorkflowImpl.java#L97-L101)). The inbox is a visibility query, not a Query, so it works with no worker running ([`WebServer.java` lines 240–247](src/main/java/io/temporal/demo/docrouting/web/WebServer.java#L240-L247)):
+The workflow upserts the `Step` search attribute at every step (the first is [`DocumentRequestWorkflowImpl.java` line 63](src/main/java/io/temporal/demo/docrouting/workflow/DocumentRequestWorkflowImpl.java#L63)), and puts the task details in its memo ([line 100](src/main/java/io/temporal/demo/docrouting/workflow/DocumentRequestWorkflowImpl.java#L96-L100)). The inbox is a visibility query, not a Query, so it works with no worker running ([`WebServer.java` lines 236–243](src/main/java/io/temporal/demo/docrouting/web/WebServer.java#L236-L243)):
 
 ```java
 client.listExecutions("WorkflowType=\"DocumentRequestWorkflow\" AND ExecutionStatus=\"Running\" AND Step=\"HumanTask\"")

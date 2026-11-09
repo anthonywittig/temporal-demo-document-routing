@@ -11,7 +11,6 @@ import io.temporal.common.WorkflowExecutionHistory;
 import io.temporal.demo.docrouting.model.DocumentRequest;
 import io.temporal.demo.docrouting.model.ErpConfirmation;
 import io.temporal.demo.docrouting.model.RequestOutcome;
-import io.temporal.demo.docrouting.model.ReviewAction;
 import io.temporal.demo.docrouting.model.ReviewDecision;
 import io.temporal.demo.docrouting.model.Route;
 import io.temporal.demo.docrouting.workflow.SearchAttrs.Steps;
@@ -85,7 +84,7 @@ class HistoryReplayTest {
     Files.createDirectories(FIXTURES);
     record("v1-human-review.json", Route.HUMAN_REVIEW, false, (wf, client) -> {
       awaitStep(wf, Steps.HUMAN_TASK);
-      wf.review(new ReviewDecision("rec-humanreview-r1", ReviewAction.REJECT, "Sam", "recorded"));
+      wf.review(new ReviewDecision("rec-humanreview-r1", false, "Sam", "recorded"));
     });
     record("v1-invoice.json", Route.INVOICE, false, (wf, client) -> {
       awaitStep(wf, Steps.AWAIT_ERP_CONFIRMATION);

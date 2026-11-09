@@ -17,7 +17,6 @@ import io.temporal.common.SearchAttributes;
 import io.temporal.demo.docrouting.Config;
 import io.temporal.demo.docrouting.model.DocumentRequest;
 import io.temporal.demo.docrouting.model.ErpConfirmation;
-import io.temporal.demo.docrouting.model.ReviewAction;
 import io.temporal.demo.docrouting.model.ReviewDecision;
 import io.temporal.demo.docrouting.model.ReviewResult;
 import io.temporal.demo.docrouting.rules.RulesLoader;
@@ -169,16 +168,13 @@ public final class WebServer {
   private void review(Context ctx) throws Exception {
     JsonNode body = JSON.readTree(ctx.body());
     String workflowId = body.path("workflowId").asText();
-    ReviewAction action;
-    try {
-      action = ReviewAction.valueOf(body.path("action").asText(""));
-    } catch (IllegalArgumentException e) {
-      ctx.status(400).json(Map.of("error", "Choose APPROVE or REJECT"));
+    if (!body.path("approved").isBoolean()) {
+      ctx.status(400).json(Map.of("error", "Say whether the cost is approved (true or false)"));
       return;
     }
     ReviewDecision decision = new ReviewDecision(
         body.path("taskId").asText(),
-        action,
+        body.path("approved").asBoolean(),
         body.path("reviewer").asText("Sam Chen"),
         body.path("comment").asText(""));
 
