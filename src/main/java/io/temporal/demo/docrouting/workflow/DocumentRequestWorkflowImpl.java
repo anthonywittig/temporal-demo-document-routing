@@ -30,11 +30,8 @@ import java.time.Instant;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.function.Supplier;
-import org.slf4j.Logger;
 
 public class DocumentRequestWorkflowImpl implements DocumentRequestWorkflow {
-  private static final Logger log = Workflow.getLogger(DocumentRequestWorkflowImpl.class);
-
   static final ActivityOptions ACTIVITY_OPTIONS =
       ActivityOptions.newBuilder()
           .setStartToCloseTimeout(Duration.ofSeconds(10))
