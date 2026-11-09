@@ -2,16 +2,16 @@ package io.temporal.demo.docrouting.workflow;
 
 import static org.junit.jupiter.api.Assertions.*;
 
-import io.temporal.api.enums.v1.IndexedValueType;
 import io.temporal.client.WorkflowClient;
 import io.temporal.client.WorkflowClientOptions;
 import io.temporal.client.WorkflowOptions;
 import io.temporal.client.WorkflowStub;
 import io.temporal.common.WorkflowExecutionHistory;
+import io.temporal.demo.docrouting.model.CompleteTask;
 import io.temporal.demo.docrouting.model.DocumentRequest;
 import io.temporal.demo.docrouting.model.ErpConfirmation;
 import io.temporal.demo.docrouting.model.RequestOutcome;
-import io.temporal.demo.docrouting.model.ReviewDecision;
+import io.temporal.demo.docrouting.model.ReassignTask;
 import io.temporal.demo.docrouting.model.Route;
 import io.temporal.demo.docrouting.workflow.SearchAttrs.Steps;
 import io.temporal.testing.TestEnvironmentOptions;
@@ -84,7 +84,8 @@ class HistoryReplayTest {
     Files.createDirectories(FIXTURES);
     record("v1-human-review.json", Route.HUMAN_REVIEW, false, (wf, client) -> {
       awaitStep(wf, Steps.HUMAN_TASK);
-      wf.review(new ReviewDecision("rec-humanreview-r1", false, "Sam", "recorded"));
+      wf.reassign(new ReassignTask("rec-humanreview-t1", "Bob", "recorded"));
+      wf.complete(new CompleteTask("rec-humanreview-t2", "recorded"));
     });
     record("v1-invoice.json", Route.INVOICE, false, (wf, client) -> {
       awaitStep(wf, Steps.AWAIT_ERP_CONFIRMATION);
@@ -103,11 +104,7 @@ class HistoryReplayTest {
         .setWorkflowClientOptions(WorkflowClientOptions.newBuilder().setIdentity("replay-fixture-recorder").build())
         .build();
     try (TestWorkflowEnvironment env = TestWorkflowEnvironment.newInstance(options)) {
-      for (var sa : new String[] {"Step", "Path", "BusinessUnit"}) {
-        env.registerSearchAttribute(sa, IndexedValueType.INDEXED_VALUE_TYPE_KEYWORD);
-      }
-      env.registerSearchAttribute("SlaBreached", IndexedValueType.INDEXED_VALUE_TYPE_BOOL);
-      env.registerSearchAttribute("RulesVersion", IndexedValueType.INDEXED_VALUE_TYPE_INT);
+      TestSearchAttributes.register(env);
       FakeActivities fake = new FakeActivities().route(route, 1);
       fake.supplierRejects = supplierRejects;
       Worker worker = env.newWorker(QUEUE);

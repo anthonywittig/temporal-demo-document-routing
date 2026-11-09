@@ -9,12 +9,13 @@ import io.temporal.demo.docrouting.activities.DocumentActivities;
 import io.temporal.demo.docrouting.activities.EvaluateRulesInput;
 import io.temporal.demo.docrouting.activities.HttpCalls;
 import io.temporal.demo.docrouting.activities.NotifyRequesterInput;
+import io.temporal.demo.docrouting.model.CompleteTask;
 import io.temporal.demo.docrouting.model.DocumentRequest;
 import io.temporal.demo.docrouting.model.ErpConfirmation;
+import io.temporal.demo.docrouting.model.ReassignTask;
 import io.temporal.demo.docrouting.model.RequestOutcome;
-import io.temporal.demo.docrouting.model.ReviewDecision;
-import io.temporal.demo.docrouting.model.ReviewResult;
 import io.temporal.demo.docrouting.model.RoutingDecision;
+import io.temporal.demo.docrouting.model.TaskResult;
 import io.temporal.demo.docrouting.workflow.SearchAttrs.Steps;
 import io.temporal.failure.ActivityFailure;
 import io.temporal.failure.ApplicationFailure;
@@ -26,8 +27,8 @@ import io.temporal.workflow.Workflow;
 import io.temporal.workflow.WorkflowVersioningBehavior;
 import java.time.Duration;
 import java.time.Instant;
-import java.util.LinkedHashMap;
-import java.util.Map;
+import java.time.OffsetDateTime;
+import java.time.ZoneOffset;
 import java.util.function.Supplier;
 
 public class DocumentRequestWorkflowImpl implements DocumentRequestWorkflow {
@@ -44,9 +45,13 @@ public class DocumentRequestWorkflowImpl implements DocumentRequestWorkflow {
   private final DocumentActivities activities =
       Workflow.newActivityStub(DocumentActivities.class, ACTIVITY_OPTIONS);
 
-  // Human review state
+  // The open human task. Each assignment is a new task ID; Complete or Reassign is accepted only
+  // for the open one, and the human-task loop acts on whichever arrives.
+  static final String FIRST_ASSIGNEE = "Alice";
   private String openTaskId;
-  private ReviewDecision humanReviewDecision;
+  private String assignee;
+  private boolean completed;
+  private String reassignTo;
 
   // The ERP's asynchronous confirmation, set by a Signal from the callback
   private ErpConfirmation erpConfirmation;
@@ -58,47 +63,50 @@ public class DocumentRequestWorkflowImpl implements DocumentRequestWorkflow {
   @Override
   @WorkflowVersioningBehavior(VersioningBehavior.PINNED)
   public RequestOutcome process(DocumentRequest doc) {
-    Workflow.upsertTypedSearchAttributes(BUSINESS_UNIT.valueSet(doc.businessUnit()));
+    Workflow.upsertTypedSearchAttributes(
+        BUSINESS_UNIT.valueSet(doc.businessUnit()), COST.valueSet(doc.cost()), COST_CENTER.valueSet(doc.costCenter()));
 
     Workflow.upsertTypedSearchAttributes(STEP.valueSet(Steps.CLASSIFY));
     String docType = activities.classify(doc);
 
-    for (int round = 1; ; round++) {
-      Workflow.upsertTypedSearchAttributes(STEP.valueSet(Steps.EVALUATE_RULES));
-      RoutingDecision route = activities.evaluateRules(new EvaluateRulesInput(doc, docType, humanReviewApproved()));
-      Workflow.upsertTypedSearchAttributes(
-          PATH.valueSet(route.path().value()), RULES_VERSION.valueSet((long) route.rulesVersion()));
+    Workflow.upsertTypedSearchAttributes(DOC_TYPE.valueSet(docType), STEP.valueSet(Steps.EVALUATE_RULES));
+    RoutingDecision route = activities.evaluateRules(new EvaluateRulesInput(doc, docType));
+    Workflow.upsertTypedSearchAttributes(
+        PATH.valueSet(route.path().value()), RULES_VERSION.valueSet((long) route.rulesVersion()));
 
-      switch (route.path()) {
-        case HUMAN_REVIEW -> {
-          humanReview(doc, route, round);
-          if (!humanReviewApproved()) {
-            return rejectedByReviewer(doc, route);
-          }
-        }
-        case INVOICE -> {
-          return invoice(doc, route);
-        }
-        case PURCHASE_ORDER -> {
-          return purchaseOrder(doc, route);
-        }
-      }
-    }
+    return switch (route.path()) {
+      case HUMAN_REVIEW -> humanReview(doc, route);
+      case INVOICE -> invoice(doc, route);
+      case PURCHASE_ORDER -> purchaseOrder(doc, route);
+    };
   }
 
-  // ---- HumanReview: a person approves or rejects the cost -----------------------------------
+  // ---- HumanReview: a person finishes the request, or hands it to someone else --------------
 
-  private void humanReview(DocumentRequest doc, RoutingDecision route, int round) {
-    openTaskId = doc.documentId() + "-r" + round;
-    humanReviewDecision = null;
-    Instant deadline = Instant.ofEpochMilli(Workflow.currentTimeMillis()).plus(settings.slaDuration());
+  private RequestOutcome humanReview(DocumentRequest doc, RoutingDecision route) {
+    assignee = FIRST_ASSIGNEE;
+    for (int n = 1; !completed; n++) {
+      humanTask(doc.documentId() + "-t" + n);
+      if (reassignTo != null) assignee = reassignTo;
+    }
 
-    Map<String, Object> memo = new LinkedHashMap<>();
-    memo.put("taskId", openTaskId);
-    memo.put("slaDeadline", deadline.toString());
-    memo.put("routingReason", route.reason());
-    Workflow.upsertMemo(memo);
-    Workflow.upsertTypedSearchAttributes(STEP.valueSet(Steps.HUMAN_TASK), SLA_BREACHED.valueSet(false));
+    Workflow.upsertTypedSearchAttributes(STEP.valueSet(Steps.NOTIFY));
+    activities.notifyRequester(new NotifyRequesterInput(doc, "completed by " + assignee));
+    return finish(doc, route, "Completed by " + assignee);
+  }
+
+  /** Opens one task for the current assignee, with its own SLA, and waits for Complete or Reassign. */
+  private void humanTask(String taskId) {
+    openTaskId = taskId;
+    reassignTo = null;
+    OffsetDateTime deadline =
+        Instant.ofEpochMilli(Workflow.currentTimeMillis()).plus(settings.slaDuration()).atOffset(ZoneOffset.UTC);
+    Workflow.upsertTypedSearchAttributes(
+        STEP.valueSet(Steps.HUMAN_TASK),
+        ASSIGNEE.valueSet(assignee),
+        TASK_ID.valueSet(taskId),
+        SLA_DEADLINE.valueSet(deadline),
+        SLA_BREACHED.valueSet(false));
 
     CancellationScope sla = Workflow.newCancellationScope(() ->
         Workflow.newTimer(settings.slaDuration(), named("ReviewSla")).handle((ignored, canceled) -> {
@@ -109,40 +117,44 @@ public class DocumentRequestWorkflowImpl implements DocumentRequestWorkflow {
         }));
     sla.run();
 
-    Workflow.await(() -> humanReviewDecision != null);
+    Workflow.await(() -> completed || reassignTo != null);
     sla.cancel();
   }
 
-  private boolean humanReviewApproved() {
-    return humanReviewDecision != null && humanReviewDecision.approved();
+  @Override
+  public void validateComplete(CompleteTask action) {
+    requireOpenTask(action == null ? null : action.taskId());
   }
 
   @Override
-  public void validateReview(ReviewDecision d) {
-    if (openTaskId == null || d == null || !openTaskId.equals(d.taskId())) {
-      throw new IllegalArgumentException(
-          "Task " + (d == null ? "?" : d.taskId()) + " is no longer open"
-              + (openTaskId == null ? "" : "; the open task is " + openTaskId));
-    }
-    if (d.reviewer() == null || d.reviewer().isBlank()) throw new IllegalArgumentException("Reviewer is required");
-  }
-
-  @Override
-  public ReviewResult review(ReviewDecision d) {
+  public TaskResult complete(CompleteTask action) {
     String taskId = openTaskId;
-    humanReviewDecision = d;
     openTaskId = null;
-    return new ReviewResult(taskId, d.approved(),
-        (d.approved() ? "Approved by " : "Rejected by ") + d.reviewer());
+    completed = true;
+    return new TaskResult(taskId, "Completed by " + assignee);
   }
 
-  /** The reviewer turned the request down: tell the requester and end, with nothing else to undo. */
-  private RequestOutcome rejectedByReviewer(DocumentRequest doc, RoutingDecision route) {
-    String reviewer = humanReviewDecision.reviewer();
-    activities.notifyRequester(new NotifyRequesterInput(doc, "rejected by " + reviewer));
-    Workflow.upsertTypedSearchAttributes(STEP.valueSet(Steps.REJECTED));
-    return new RequestOutcome(RequestOutcome.REJECTED, route.path(), route.rulesVersion(),
-        "Rejected by " + reviewer);
+  @Override
+  public void validateReassign(ReassignTask action) {
+    requireOpenTask(action == null ? null : action.taskId());
+    if (action.assignee() == null || action.assignee().isBlank()) {
+      throw new IllegalArgumentException("Say who to reassign task " + action.taskId() + " to");
+    }
+  }
+
+  @Override
+  public TaskResult reassign(ReassignTask action) {
+    String taskId = openTaskId;
+    openTaskId = null;
+    reassignTo = action.assignee().trim();
+    return new TaskResult(taskId, assignee + " reassigned it to " + reassignTo);
+  }
+
+  private void requireOpenTask(String taskId) {
+    if (openTaskId == null || !openTaskId.equals(taskId)) {
+      throw new IllegalArgumentException(
+          "Task " + taskId + " is no longer open" + (openTaskId == null ? "" : "; the open task is " + openTaskId));
+    }
   }
 
   // ---- Invoice: ERP posting, asynchronous confirmation, notification ------------------------
