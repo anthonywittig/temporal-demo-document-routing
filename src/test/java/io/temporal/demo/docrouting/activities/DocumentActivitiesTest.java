@@ -71,7 +71,7 @@ class DocumentActivitiesTest {
 
   @Test
   void classifyAndRoute() {
-    String type = activities.classify(SERVICES_INVOICE);
+    String type = activities.classify(SERVICES_INVOICE).docType();
     assertEquals("invoice", type);
     var decision = activities.evaluateRules(new EvaluateRulesInput(SERVICES_INVOICE, type));
     assertEquals(Route.INVOICE, decision.path());
@@ -97,7 +97,7 @@ class DocumentActivitiesTest {
 
   @Test
   void erpPostingCallsBackToTheWebApp() throws Exception {
-    String postingId = activities.postInvoiceToErp(SERVICES_INVOICE);
+    String postingId = activities.postInvoiceToErp(SERVICES_INVOICE).postingId();
     assertTrue(postingId.startsWith("ERP-"));
     JsonNode ack = callbacks.poll(5, TimeUnit.SECONDS);
     assertNotNull(ack);
