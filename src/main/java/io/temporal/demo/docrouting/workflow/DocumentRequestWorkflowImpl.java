@@ -63,22 +63,19 @@ public class DocumentRequestWorkflowImpl implements DocumentRequestWorkflow {
 
     Workflow.upsertTypedSearchAttributes(STEP.valueSet(Steps.CLASSIFY));
     String docType = activities.classify(doc);
-    boolean humanReviewApproved = false;
 
     for (int round = 1; ; round++) {
       Workflow.upsertTypedSearchAttributes(STEP.valueSet(Steps.EVALUATE_RULES));
-      RoutingDecision route = activities.evaluateRules(new EvaluateRulesInput(doc, docType, humanReviewApproved));
+      RoutingDecision route = activities.evaluateRules(new EvaluateRulesInput(doc, docType, humanReviewApproved()));
       Workflow.upsertTypedSearchAttributes(
           PATH.valueSet(route.path().value()), RULES_VERSION.valueSet((long) route.rulesVersion()));
 
       switch (route.path()) {
         case HUMAN_REVIEW -> {
           ReviewDecision review = humanTask(doc, route, round);
-          if (review.action() == ReviewAction.APPROVE) {
-            humanReviewApproved = true;
-            continue;
+          if (review.action() == ReviewAction.REJECT) {
+            return rejectedByReviewer(doc, route, review);
           }
-          return rejectedByReviewer(doc, route, review);
         }
         case INVOICE -> {
           return invoice(doc, route);
@@ -116,6 +113,10 @@ public class DocumentRequestWorkflowImpl implements DocumentRequestWorkflow {
     Workflow.await(() -> humanReviewDecision != null);
     sla.cancel();
     return humanReviewDecision;
+  }
+
+  private boolean humanReviewApproved() {
+    return humanReviewDecision != null && humanReviewDecision.action() == ReviewAction.APPROVE;
   }
 
   @Override
