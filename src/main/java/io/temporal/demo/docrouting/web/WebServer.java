@@ -141,11 +141,9 @@ public final class WebServer {
                 .build())
             .setMemo(Map.of(
                 "documentId", doc.documentId(),
-                "businessUnit", doc.businessUnit(),
                 "docType", doc.docType(),
                 "cost", doc.cost(),
-                "costCenter", doc.costCenter(),
-                "requester", doc.requester()))
+                "costCenter", doc.costCenter()))
             .build());
     Map<String, Object> result = new LinkedHashMap<>();
     result.put("documentId", doc.documentId());
