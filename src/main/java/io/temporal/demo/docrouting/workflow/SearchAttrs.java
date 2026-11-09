@@ -1,6 +1,8 @@
 package io.temporal.demo.docrouting.workflow;
 
 import io.temporal.common.SearchAttributeKey;
+import java.time.OffsetDateTime;
+import java.util.List;
 
 /**
  * Searchable progress, kept current by the Workflow at every meaningful step. These are what the
@@ -14,6 +16,18 @@ public final class SearchAttrs {
   public static final SearchAttributeKey<String> BUSINESS_UNIT = SearchAttributeKey.forKeyword("BusinessUnit");
   public static final SearchAttributeKey<Boolean> SLA_BREACHED = SearchAttributeKey.forBoolean("SlaBreached");
   public static final SearchAttributeKey<Long> RULES_VERSION = SearchAttributeKey.forLong("RulesVersion");
+  public static final SearchAttributeKey<Long> COST = SearchAttributeKey.forLong("Cost");
+  public static final SearchAttributeKey<String> COST_CENTER = SearchAttributeKey.forKeyword("CostCenter");
+  public static final SearchAttributeKey<String> DOC_TYPE = SearchAttributeKey.forKeyword("DocType");
+
+  // The open human task. Left as they were once the request moves on, so they say who finished it.
+  public static final SearchAttributeKey<String> ASSIGNEE = SearchAttributeKey.forKeyword("Assignee");
+  public static final SearchAttributeKey<String> TASK_ID = SearchAttributeKey.forKeyword("TaskId");
+  public static final SearchAttributeKey<OffsetDateTime> SLA_DEADLINE = SearchAttributeKey.forOffsetDateTime("SlaDeadline");
+
+  /** Every custom attribute, for registering them in tests. The Makefile registers the same set. */
+  public static final List<SearchAttributeKey<?>> ALL = List.of(
+      STEP, PATH, BUSINESS_UNIT, SLA_BREACHED, RULES_VERSION, COST, COST_CENTER, DOC_TYPE, ASSIGNEE, TASK_ID, SLA_DEADLINE);
 
   /** Values of {@link #STEP}. */
   public static final class Steps {

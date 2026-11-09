@@ -2,7 +2,6 @@ package io.temporal.demo.docrouting.workflow;
 
 import static org.junit.jupiter.api.Assertions.*;
 
-import io.temporal.api.enums.v1.IndexedValueType;
 import io.temporal.api.history.v1.HistoryEvent;
 import io.temporal.client.WorkflowClient;
 import io.temporal.client.WorkflowExecutionDescription;
@@ -11,12 +10,13 @@ import io.temporal.client.WorkflowOptions;
 import io.temporal.client.WorkflowStub;
 import io.temporal.client.WorkflowUpdateException;
 import io.temporal.common.converter.DefaultDataConverter;
+import io.temporal.demo.docrouting.model.CompleteTask;
 import io.temporal.demo.docrouting.model.DocumentRequest;
 import io.temporal.demo.docrouting.model.ErpConfirmation;
 import io.temporal.demo.docrouting.model.RequestOutcome;
-import io.temporal.demo.docrouting.model.ReviewDecision;
-import io.temporal.demo.docrouting.model.ReviewResult;
+import io.temporal.demo.docrouting.model.ReassignTask;
 import io.temporal.demo.docrouting.model.Route;
+import io.temporal.demo.docrouting.model.TaskResult;
 import io.temporal.demo.docrouting.workflow.SearchAttrs.Steps;
 import io.temporal.failure.ApplicationFailure;
 import io.temporal.testing.TestWorkflowEnvironment;
@@ -39,11 +39,7 @@ class DocumentRequestWorkflowTest {
 
   void start(boolean archive) {
     env = TestWorkflowEnvironment.newInstance();
-    env.registerSearchAttribute("Step", IndexedValueType.INDEXED_VALUE_TYPE_KEYWORD);
-    env.registerSearchAttribute("Path", IndexedValueType.INDEXED_VALUE_TYPE_KEYWORD);
-    env.registerSearchAttribute("BusinessUnit", IndexedValueType.INDEXED_VALUE_TYPE_KEYWORD);
-    env.registerSearchAttribute("SlaBreached", IndexedValueType.INDEXED_VALUE_TYPE_BOOL);
-    env.registerSearchAttribute("RulesVersion", IndexedValueType.INDEXED_VALUE_TYPE_INT);
+    TestSearchAttributes.register(env);
     Worker worker = env.newWorker(QUEUE);
     WorkflowSettings settings = new WorkflowSettings(SLA, CALLBACK_TIMEOUT, archive);
     worker.registerWorkflowImplementationFactory(
@@ -105,9 +101,13 @@ class DocumentRequestWorkflowTest {
     assertEquals("HumanReview", attrs.get(SearchAttrs.PATH));
     assertEquals("Equipment", attrs.get(SearchAttrs.BUSINESS_UNIT));
     assertEquals(7L, attrs.get(SearchAttrs.RULES_VERSION));
+    assertEquals(3000L, attrs.get(SearchAttrs.COST));
+    assertEquals("CC-10", attrs.get(SearchAttrs.COST_CENTER));
+    assertEquals("invoice", attrs.get(SearchAttrs.DOC_TYPE));
     assertEquals(false, attrs.get(SearchAttrs.SLA_BREACHED));
-    assertEquals("sa1-r1", describe(wf).getMemo("taskId", String.class));
     assertEquals(List.of("Classify", "EvaluateRules"), fake.calls());
+    assertEquals(0, describe(wf).getWorkflowExecutionInfo().getMemo().getFieldsCount(),
+        "everything the inbox shows is a search attribute");
   }
 
   // ---- Invoice -------------------------------------------------------------------------------
@@ -188,88 +188,129 @@ class DocumentRequestWorkflowTest {
 
   // ---- HumanReview ---------------------------------------------------------------------------
 
+  String attr(DocumentRequestWorkflow wf, io.temporal.common.SearchAttributeKey<String> key) {
+    return describe(wf).getTypedSearchAttributes().get(key);
+  }
+
+  long updatesInHistory(String documentId) {
+    return client.fetchHistory(DocumentRequestWorkflow.workflowId(documentId)).getEvents().stream()
+        .filter(ev -> ev.hasWorkflowExecutionUpdateAcceptedEventAttributes()).count();
+  }
+
   @Test
-  void reviewerRejectsTheRequest() throws Exception {
-    start(true); // even on v2, a rejection is not archived
+  void taskOpensAssignedToAlice() throws Exception {
+    start(false);
     fake.route(Route.HUMAN_REVIEW, 1);
-    var wf = begin(doc("a1", "Equipment", "invoice", 3000));
+    var wf = begin(doc("h1", "Equipment", "invoice", 3000));
     awaitStep(wf, Steps.HUMAN_TASK);
-    ReviewResult r = wf.review(new ReviewDecision("a1-r1", false, "Sam", "not in budget"));
-    assertEquals("a1-r1", r.taskId());
-    assertEquals("Rejected by Sam", r.message());
+    assertEquals("Alice", attr(wf, SearchAttrs.ASSIGNEE));
+    assertEquals("h1-t1", attr(wf, SearchAttrs.TASK_ID));
+    var deadline = describe(wf).getTypedSearchAttributes().get(SearchAttrs.SLA_DEADLINE);
+    assertNotNull(deadline, "the inbox sorts and counts down on SlaDeadline");
+  }
+
+  @Test
+  void completingTheTaskEndsTheRequest() throws Exception {
+    start(false);
+    fake.route(Route.HUMAN_REVIEW, 1);
+    var wf = begin(doc("h2", "Equipment", "invoice", 3000));
+    awaitStep(wf, Steps.HUMAN_TASK);
+    TaskResult r = wf.complete(new CompleteTask("h2-t1", "looks fine"));
+    assertEquals("h2-t1", r.taskId());
+    assertEquals("Completed by Alice", r.message());
     RequestOutcome outcome = result(wf);
-    assertEquals(RequestOutcome.REJECTED, outcome.status());
+    assertEquals(RequestOutcome.COMPLETED, outcome.status());
     assertEquals(Route.HUMAN_REVIEW, outcome.path());
-    assertTrue(outcome.detail().contains("Sam"));
+    assertEquals("Completed by Alice", outcome.detail());
+    assertEquals(List.of("Classify", "EvaluateRules", "NotifyRequester"), fake.calls(),
+        "no ERP posting, budget or purchase order on this path");
+    assertEquals(List.of("completed by Alice"), fake.notifications);
+    assertEquals(Steps.COMPLETED, step(wf));
+  }
+
+  @Test
+  void reassigningOpensANewTaskForTheNamedPerson() throws Exception {
+    start(false);
+    fake.route(Route.HUMAN_REVIEW, 1);
+    var wf = begin(doc("h3", "Equipment", "invoice", 3000));
+    awaitStep(wf, Steps.HUMAN_TASK);
+
+    TaskResult r = wf.reassign(new ReassignTask("h3-t1", " Bob ", "on leave"));
+    assertEquals("Alice reassigned it to Bob", r.message());
+    assertEquals("Bob", attr(wf, SearchAttrs.ASSIGNEE));
+    assertEquals("h3-t2", attr(wf, SearchAttrs.TASK_ID));
+    assertEquals(Steps.HUMAN_TASK, step(wf));
+
+    wf.reassign(new ReassignTask("h3-t2", "Priya Shah", ""));
+    assertEquals("Priya Shah", attr(wf, SearchAttrs.ASSIGNEE));
+    assertEquals("h3-t3", attr(wf, SearchAttrs.TASK_ID));
+
+    assertEquals("Completed by Priya Shah", wf.complete(new CompleteTask("h3-t3", "")).message());
+    assertEquals("Completed by Priya Shah", result(wf).detail());
     assertEquals(List.of("Classify", "EvaluateRules", "NotifyRequester"), fake.calls());
-    assertEquals(Steps.REJECTED, step(wf));
   }
 
   @Test
-  void approveReEvaluatesUnderCurrentRulesWithTheApproval() throws Exception {
+  void staleOrWrongTaskIsRefusedWithoutTouchingHistory() throws Exception {
     start(false);
-    fake.route(Route.HUMAN_REVIEW, 1).route(Route.INVOICE, 2); // the rules change while the task is open
-    var wf = begin(doc("a2", "Equipment", "invoice", 3000));
-    awaitStep(wf, Steps.HUMAN_TASK);
-    ReviewResult r = wf.review(new ReviewDecision("a2-r1", true, "Sam", "worth it"));
-    assertEquals("Approved by Sam", r.message());
-    awaitStep(wf, Steps.AWAIT_ERP_CONFIRMATION);
-    wf.erpPostingConfirmed(new ErpConfirmation("A-test", "now"));
-    RequestOutcome outcome = result(wf);
-    assertEquals(RequestOutcome.COMPLETED, outcome.status());
-    assertEquals(Route.INVOICE, outcome.path());
-    assertEquals(2, outcome.rulesVersion());
-    assertEquals(List.of(false, true), fake.costApprovedFlags, "the second evaluation must carry the approval");
-  }
-
-  @Test
-  void approvalCanStillEndInPurchaseOrder() throws Exception {
-    start(false);
-    fake.route(Route.HUMAN_REVIEW, 1).route(Route.PURCHASE_ORDER, 1);
-    var wf = begin(doc("a5", "Equipment", "purchase-order", 3000));
-    awaitStep(wf, Steps.HUMAN_TASK);
-    wf.review(new ReviewDecision("a5-r1", true, "Sam", ""));
-    RequestOutcome outcome = result(wf);
-    assertEquals(RequestOutcome.COMPLETED, outcome.status());
-    assertEquals(Route.PURCHASE_ORDER, outcome.path());
-    assertEquals(List.of("Classify", "EvaluateRules", "EvaluateRules",
-        "ReserveBudget", "SendPurchaseOrder", "NotifyRequester"), fake.calls());
-  }
-
-  @Test
-  void staleOrWrongTaskIsRejectedWithoutTouchingHistory() throws Exception {
-    start(false);
-    fake.route(Route.HUMAN_REVIEW, 1).route(Route.HUMAN_REVIEW, 1);
-    var wf = begin(doc("a3", "Equipment", "invoice", 3000));
+    fake.route(Route.HUMAN_REVIEW, 1);
+    var wf = begin(doc("h4", "Equipment", "invoice", 3000));
     awaitStep(wf, Steps.HUMAN_TASK);
 
-    var wrong = assertThrows(WorkflowUpdateException.class,
-        () -> wf.review(new ReviewDecision("nope", false, "Sam", "")));
+    var wrong = assertThrows(WorkflowUpdateException.class, () -> wf.complete(new CompleteTask("nope", "")));
     assertTrue(wrong.getCause().getMessage().contains("no longer open"), wrong.getCause().getMessage());
 
-    wf.review(new ReviewDecision("a3-r1", true, "Sam", ""));
-    awaitStep(wf, Steps.HUMAN_TASK); // the scripted rules route it to a person again
-    // A second click on the first task, after it was approved, is stale.
-    var stale = assertThrows(WorkflowUpdateException.class,
-        () -> wf.review(new ReviewDecision("a3-r1", false, "Sam", "")));
-    assertTrue(stale.getCause().getMessage().contains("a3-r2"), stale.getCause().getMessage());
+    wf.reassign(new ReassignTask("h4-t1", "Bob", ""));
+    // A click on Alice's task after it moved to Bob is stale, and names the open task.
+    var stale = assertThrows(WorkflowUpdateException.class, () -> wf.complete(new CompleteTask("h4-t1", "")));
+    assertTrue(stale.getCause().getMessage().contains("h4-t2"), stale.getCause().getMessage());
 
-    long updatesInHistory = client.fetchHistory(DocumentRequestWorkflow.workflowId("a3")).getEvents().stream()
-        .filter(ev -> ev.hasWorkflowExecutionUpdateAcceptedEventAttributes()).count();
-    assertEquals(1, updatesInHistory, "rejected updates must not be written to history");
+    assertEquals(1, updatesInHistory("h4"), "refused updates must not be written to history");
+    assertEquals("Bob", attr(wf, SearchAttrs.ASSIGNEE));
   }
 
   @Test
-  void slaBreachMarksTheTaskButKeepsItOpen() throws Exception {
+  void blankReassignmentIsRefused() throws Exception {
     start(false);
     fake.route(Route.HUMAN_REVIEW, 1);
-    var wf = begin(doc("a4", "Equipment", "invoice", 3000));
+    var wf = begin(doc("h5", "Equipment", "invoice", 3000));
+    awaitStep(wf, Steps.HUMAN_TASK);
+    var e = assertThrows(WorkflowUpdateException.class, () -> wf.reassign(new ReassignTask("h5-t1", "  ", "")));
+    assertTrue(e.getCause().getMessage().contains("reassign"), e.getCause().getMessage());
+    assertEquals("Alice", attr(wf, SearchAttrs.ASSIGNEE));
+    assertEquals("h5-t1", attr(wf, SearchAttrs.TASK_ID));
+    assertEquals(0, updatesInHistory("h5"));
+  }
+
+  @Test
+  void slaBreachMarksTheTaskAndReassigningRestartsIt() throws Exception {
+    start(false);
+    fake.route(Route.HUMAN_REVIEW, 1);
+    var wf = begin(doc("h6", "Equipment", "invoice", 3000));
     awaitStep(wf, Steps.HUMAN_TASK);
     env.sleep(SLA.plusSeconds(5));
     assertEquals(true, describe(wf).getTypedSearchAttributes().get(SearchAttrs.SLA_BREACHED));
     assertEquals(Steps.HUMAN_TASK, step(wf));
-    wf.review(new ReviewDecision("a4-r1", false, "Sam", "late, and no"));
-    assertEquals(RequestOutcome.REJECTED, result(wf).status());
+
+    wf.reassign(new ReassignTask("h6-t1", "Bob", "late; over to you"));
+    assertEquals(false, describe(wf).getTypedSearchAttributes().get(SearchAttrs.SLA_BREACHED));
+    env.sleep(SLA.plusSeconds(5));
+    assertEquals(true, describe(wf).getTypedSearchAttributes().get(SearchAttrs.SLA_BREACHED), "Bob's task has its own SLA");
+
+    wf.complete(new CompleteTask("h6-t2", "late, but done"));
+    assertEquals(RequestOutcome.COMPLETED, result(wf).status());
+  }
+
+  @Test
+  void v2ArchivesAfterTheTaskIsCompleted() throws Exception {
+    start(true);
+    fake.route(Route.HUMAN_REVIEW, 1);
+    var wf = begin(doc("h7", "Equipment", "invoice", 3000));
+    awaitStep(wf, Steps.HUMAN_TASK);
+    wf.complete(new CompleteTask("h7-t1", ""));
+    result(wf);
+    assertEquals(List.of("Classify", "EvaluateRules", "NotifyRequester", "ArchiveDocument"), fake.calls());
+    assertEquals(Steps.COMPLETED, step(wf));
   }
 
   // ---- PurchaseOrder -------------------------------------------------------------------------

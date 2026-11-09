@@ -3,8 +3,9 @@ package io.temporal.demo.docrouting.workflow;
 import io.temporal.demo.docrouting.model.DocumentRequest;
 import io.temporal.demo.docrouting.model.ErpConfirmation;
 import io.temporal.demo.docrouting.model.RequestOutcome;
-import io.temporal.demo.docrouting.model.ReviewDecision;
-import io.temporal.demo.docrouting.model.ReviewResult;
+import io.temporal.demo.docrouting.model.CompleteTask;
+import io.temporal.demo.docrouting.model.ReassignTask;
+import io.temporal.demo.docrouting.model.TaskResult;
 import io.temporal.workflow.SignalMethod;
 import io.temporal.workflow.UpdateMethod;
 import io.temporal.workflow.UpdateValidatorMethod;
@@ -25,12 +26,19 @@ public interface DocumentRequestWorkflow {
   @WorkflowMethod
   RequestOutcome process(DocumentRequest doc);
 
-  /** HumanReview: a reviewer approves or rejects the open task. Refused if the task isn't open. */
-  @UpdateMethod(name = "Review")
-  ReviewResult review(ReviewDecision decision);
+  /** HumanReview: finish the open task, which ends the request. Refused if the task isn't open. */
+  @UpdateMethod(name = "Complete")
+  TaskResult complete(CompleteTask action);
 
-  @UpdateValidatorMethod(updateName = "Review")
-  void validateReview(ReviewDecision decision);
+  @UpdateValidatorMethod(updateName = "Complete")
+  void validateComplete(CompleteTask action);
+
+  /** HumanReview: hand the open task to someone else. Refused if the task isn't open or no one is named. */
+  @UpdateMethod(name = "Reassign")
+  TaskResult reassign(ReassignTask action);
+
+  @UpdateValidatorMethod(updateName = "Reassign")
+  void validateReassign(ReassignTask action);
 
   /** Invoice: the ERP's confirmation of the posting, delivered by callback. */
   @SignalMethod(name = "ErpPostingConfirmed")

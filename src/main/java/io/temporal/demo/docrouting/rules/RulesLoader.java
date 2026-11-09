@@ -26,8 +26,8 @@ public final class RulesLoader {
       new ObjectMapper().enable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES);
 
   /**
-   * A unit's rules: the cost above which a person must approve. The path follows from the
-   * document type alone ({@link #pathFor}).
+   * A unit's rules: the cost above which a person must review the request. Within it, the path
+   * follows from the document type alone ({@link #pathFor}).
    */
   public record UnitRules(long humanReviewAbove) {}
 
@@ -96,42 +96,26 @@ public final class RulesLoader {
    * refused, before it can reach a reviewer.
    */
   public RoutingDecision evaluate(String businessUnit, String docType, long cost) {
-    return evaluate(businessUnit, docType, cost, false);
-  }
-
-  /**
-   * As {@link #evaluate(String, String, long)}, but {@code costApproved} says a reviewer has
-   * already accepted the cost. The approval is only consulted when the rules in force now still
-   * put the cost above the threshold: then it stands in for the review, whichever rules version
-   * asked for it. If the current rules no longer need a review, the document is routed by them
-   * alone, as if no one had been asked.
-   */
-  public RoutingDecision evaluate(String businessUnit, String docType, long cost, boolean costApproved) {
     Rules rules = current();
     UnitRules unit = rules.businessUnits().get(businessUnit);
     if (unit == null) throw new UnknownBusinessUnitException(businessUnit);
     Route path = pathFor(docType);
 
-    String costNote;
     if (cost > unit.humanReviewAbove()) {
-      if (!costApproved) {
-        return new RoutingDecision(
-            Route.HUMAN_REVIEW,
-            "%s: cost %d is above the human-review threshold %d".formatted(businessUnit, cost, unit.humanReviewAbove()),
-            rules.version());
-      }
-      costNote = "cost %d is above %d, approved by a reviewer".formatted(cost, unit.humanReviewAbove());
-    } else {
-      costNote = "cost %d is within %d".formatted(cost, unit.humanReviewAbove());
+      return new RoutingDecision(
+          Route.HUMAN_REVIEW,
+          "%s: cost %d is above the human-review threshold %d".formatted(businessUnit, cost, unit.humanReviewAbove()),
+          rules.version());
     }
+    String costNote = "cost %d is within %d".formatted(cost, unit.humanReviewAbove());
     String action = path == Route.PURCHASE_ORDER ? "go out as a purchase order" : "are posted to the ERP";
     return new RoutingDecision(
         path, "%s: %s documents %s (%s)".formatted(businessUnit, docType, action, costNote), rules.version());
   }
 
   /**
-   * The path for a document whose cost needs no (further) approval. Never HumanReview: only the
-   * cost threshold sends a request to a person, so an approved request can't be sent back.
+   * The path for a document whose cost is within the threshold. Never HumanReview: only the cost
+   * threshold sends a request to a person.
    */
   static Route pathFor(String docType) {
     return switch (docType) {

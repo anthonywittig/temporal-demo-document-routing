@@ -2,7 +2,7 @@
 
 A document arrives, is classified, and business-unit rules route it down one of three paths:
 
-- **`HumanReview`.** A reviewer rejects the request, which ends it, or approves its cost, which sends it back through the rules in force now, so it continues down `Invoice` or `PurchaseOrder`. The approval only counts if those rules still put the cost above the threshold; if a rule change has since brought the cost within it, the request is routed by the new rules alone.
+- **`HumanReview`.** A person finishes the request. Every task starts with Alice; whoever holds it can complete it, which notifies the requester and ends the request, or reassign it to anyone by name. Each assignment has its own SLA.
 - **`Invoice`.** The invoice is posted to the ERP, which confirms the posting asynchronously, and the requester is notified.
 - **`PurchaseOrder`.** Budget is reserved against the purchase order's cost center, which fails without retrying if the cost center is unknown, and the PO is sent to the supplier portal. If the supplier rejects it, the budget reservation is released.
 
