@@ -1,17 +1,12 @@
 package io.temporal.demo.docrouting.workflow;
 
 import io.temporal.activity.Activity;
-import io.temporal.demo.docrouting.activities.ArchiveDocumentOutput;
 import io.temporal.demo.docrouting.activities.ClassifyOutput;
 import io.temporal.demo.docrouting.activities.DocumentActivities;
 import io.temporal.demo.docrouting.activities.EvaluateRulesInput;
 import io.temporal.demo.docrouting.activities.HttpCalls;
 import io.temporal.demo.docrouting.activities.NotifyRequesterInput;
-import io.temporal.demo.docrouting.activities.NotifyRequesterOutput;
 import io.temporal.demo.docrouting.activities.PostInvoiceToErpOutput;
-import io.temporal.demo.docrouting.activities.ReleaseBudgetOutput;
-import io.temporal.demo.docrouting.activities.ReserveBudgetOutput;
-import io.temporal.demo.docrouting.activities.SendPurchaseOrderOutput;
 import io.temporal.demo.docrouting.model.DocumentRequest;
 import io.temporal.demo.docrouting.model.Route;
 import io.temporal.demo.docrouting.model.RoutingDecision;
@@ -66,40 +61,35 @@ public class FakeActivities implements DocumentActivities {
   }
 
   @Override
-  public NotifyRequesterOutput notifyRequester(NotifyRequesterInput input) {
+  public void notifyRequester(NotifyRequesterInput input) {
     record();
     notifications.add(input.message());
-    return new NotifyRequesterOutput();
   }
 
   @Override
-  public ReserveBudgetOutput reserveBudget(DocumentRequest doc) {
+  public void reserveBudget(DocumentRequest doc) {
     record();
     if (costCenterUnknown) {
       throw ApplicationFailure.newNonRetryableFailure(
           "Budget: unknown cost center " + doc.costCenter(), HttpCalls.REJECTED);
     }
-    return new ReserveBudgetOutput();
   }
 
   @Override
-  public ReleaseBudgetOutput releaseBudget(DocumentRequest doc) {
+  public void releaseBudget(DocumentRequest doc) {
     record();
-    return new ReleaseBudgetOutput();
   }
 
   @Override
-  public SendPurchaseOrderOutput sendPurchaseOrder(DocumentRequest doc) {
+  public void sendPurchaseOrder(DocumentRequest doc) {
     record();
     if (supplierRejects) {
       throw ApplicationFailure.newNonRetryableFailure("Supplier portal rejected the purchase order", HttpCalls.REJECTED);
     }
-    return new SendPurchaseOrderOutput();
   }
 
   @Override
-  public ArchiveDocumentOutput archiveDocument(DocumentRequest doc) {
+  public void archiveDocument(DocumentRequest doc) {
     record();
-    return new ArchiveDocumentOutput();
   }
 }

@@ -9,9 +9,9 @@ import io.temporal.demo.docrouting.model.RoutingDecision;
  * {@code <workflowId>/<activity type>}, which stays the same across retries and resets, so a
  * repeat never causes a second effect.
  *
- * <p>Each Activity takes a single input object and returns an output object, even where it has
- * nothing to return yet, so a field can be added to either later without changing the signature,
- * and the Temporal UI shows inputs and results with named fields.
+ * <p>Each Activity takes a single input object, and each one with a result returns an output
+ * object, so a field can be added to either later without changing the signature, and the
+ * Temporal UI shows inputs and results with named fields.
  */
 @ActivityInterface
 public interface DocumentActivities {
@@ -26,17 +26,17 @@ public interface DocumentActivities {
   PostInvoiceToErpOutput postInvoiceToErp(DocumentRequest doc);
 
   /** Every path: tell the requester the outcome. */
-  NotifyRequesterOutput notifyRequester(NotifyRequesterInput input);
+  void notifyRequester(NotifyRequesterInput input);
 
   /** PurchaseOrder: reserve the cost against its cost center. Fails without retry if the cost center is unknown. */
-  ReserveBudgetOutput reserveBudget(DocumentRequest doc);
+  void reserveBudget(DocumentRequest doc);
 
   /** PurchaseOrder compensation: release the budget reservation. */
-  ReleaseBudgetOutput releaseBudget(DocumentRequest doc);
+  void releaseBudget(DocumentRequest doc);
 
   /** PurchaseOrder: send the purchase order to the supplier portal. Fails without retry if the supplier rejects it. */
-  SendPurchaseOrderOutput sendPurchaseOrder(DocumentRequest doc);
+  void sendPurchaseOrder(DocumentRequest doc);
 
   /** v2 only: archive the processed document. */
-  ArchiveDocumentOutput archiveDocument(DocumentRequest doc);
+  void archiveDocument(DocumentRequest doc);
 }
