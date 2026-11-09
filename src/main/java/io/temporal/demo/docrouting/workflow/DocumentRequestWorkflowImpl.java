@@ -47,7 +47,7 @@ public class DocumentRequestWorkflowImpl implements DocumentRequestWorkflow {
 
   // Human review state
   private String openTaskId;
-  private ReviewDecision decision;
+  private ReviewDecision humanReviewDecision;
 
   // The ERP's asynchronous confirmation, set by a Signal from the callback
   private ErpConfirmation erpConfirmation;
@@ -94,7 +94,7 @@ public class DocumentRequestWorkflowImpl implements DocumentRequestWorkflow {
 
   private ReviewDecision humanTask(DocumentRequest doc, RoutingDecision route, int round) {
     openTaskId = doc.documentId() + "-r" + round;
-    decision = null;
+    humanReviewDecision = null;
     Instant deadline = Instant.ofEpochMilli(Workflow.currentTimeMillis()).plus(settings.slaDuration());
 
     Map<String, Object> memo = new LinkedHashMap<>();
@@ -113,9 +113,9 @@ public class DocumentRequestWorkflowImpl implements DocumentRequestWorkflow {
         }));
     sla.run();
 
-    Workflow.await(() -> decision != null);
+    Workflow.await(() -> humanReviewDecision != null);
     sla.cancel();
-    return decision;
+    return humanReviewDecision;
   }
 
   @Override
@@ -132,7 +132,7 @@ public class DocumentRequestWorkflowImpl implements DocumentRequestWorkflow {
   @Override
   public ReviewResult review(ReviewDecision d) {
     String taskId = openTaskId;
-    decision = d;
+    humanReviewDecision = d;
     openTaskId = null;
     return new ReviewResult(taskId, d.action(),
         d.action() == ReviewAction.APPROVE ? "Approved by " + d.reviewer() : "Rejected by " + d.reviewer());
