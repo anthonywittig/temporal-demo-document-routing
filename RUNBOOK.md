@@ -107,27 +107,20 @@ Thirty-second version: "A document comes in, is classified, and business-unit ru
 
 1. Under **Human tasks**, the Equipment request from beat 2 is assigned to **Bob**, with task ID `…-t1` under the document ID. Type `Alice` in its reassign box, add a comment, and click **Reassign**. A toast says "Reassign to Alice: recorded by Temporal". The row now shows **Alice**, task `…-t2`, and a fresh SLA countdown.
 2. Click **Waiting on Alice** under **Temporal UI views**. The request is in Alice's queue now. Say: "A person's queue is a visibility query on the `Assignee` search attribute. There's no inbox service to keep in sync, and it works with no worker running."
-3. Optional, for a stale click: each assignment has a new task ID, so an action on an old one is refused. In the third terminal, try to complete Bob's task on that request (use its document ID):
-
-   ```sh
-   temporal workflow update execute --disable-config-file -w doc-<ID> --name Complete --input '{"taskId":"<ID>-t1","comment":""}'
-   ```
-
-   It fails with "Task <ID>-t1 is no longer open; the open task is <ID>-t2". The Update's validator refused it, and nothing was written to history.
-4. On Alice's row, click **Complete**. A toast says "Completed by Alice: recorded by Temporal", and the row leaves the list. In **Recent requests** it shows path **HumanReview**, step **Completed**.
-5. Open it in the Temporal UI. After `EvaluateRules` (v1 → `HumanReview`), the history shows:
+3. On Alice's row, click **Complete**. A toast says "Completed by Alice: recorded by Temporal", and the row leaves the list. In **Recent requests** it shows path **HumanReview**, step **Completed**.
+4. Open it in the Temporal UI. After `EvaluateRules` (v1 → `HumanReview`), the history shows:
    - the first `ReviewSla` timer;
    - the Signal `Reassign`, with the task ID, Alice and the comment, after which that timer is canceled and a second `ReviewSla` starts for Alice;
    - the Update `Complete`;
    - `NotifyRequester`.
 
    There's no ERP posting: the person's decision is the end of this path.
-6. Say: "The human task is the path. The workflow waited durably for a person, seconds here and days in production, and each hand-off is in the history: who had it, who it went to, and who finished it. Each assignment has its own SLA, so a breach means the person holding it now is late."
-7. Optional, to show that who gets the work is a rule too: in the **Routing rules** card, set Services' **First assignee** to `Carol` and click **Save as v3**. Then click **Services · invoice · $12,000**. It lands under **Human tasks**, assigned to Alice (Carol if you made the change), above the Services threshold of 5000. Click **Waiting on a person** under **Temporal UI views** to show the same list in the Temporal UI.
-8. Let the SLA run out while you talk (60 seconds by default). The row turns red with **SLA breached**. In the Temporal UI, **SLA breached** lists it, and the request's timeline shows the fired `ReviewSla` (1m) timer.
-9. Say: "The SLA is a durable timer. Breaching it flags the request; it doesn't cancel it. The task can still be completed, or reassigned, which starts a new SLA for the next person. In production the flag is what you alert on."
-10. **Don't complete or reassign this one.** It's the open v1 request for beat 7.
-11. If asked what happens when a task bounces between people for months: each hand-off adds a few events to the history. A long-lived task would use Continue-As-New to start a fresh history that carries the open task over. This demo doesn't need it.
+5. Say: "The human task is the path. The workflow waited durably for a person, seconds here and days in production, and each hand-off is in the history: who had it, who it went to, and who finished it. Each assignment has its own SLA, so a breach means the person holding it now is late."
+6. Optional, to show that who gets the work is a rule too: in the **Routing rules** card, set Services' **First assignee** to `Carol` and click **Save as v3**. Then click **Services · invoice · $12,000**. It lands under **Human tasks**, assigned to Alice (Carol if you made the change), above the Services threshold of 5000. Click **Waiting on a person** under **Temporal UI views** to show the same list in the Temporal UI.
+7. Let the SLA run out while you talk (60 seconds by default). The row turns red with **SLA breached**. In the Temporal UI, **SLA breached** lists it, and the request's timeline shows the fired `ReviewSla` (1m) timer.
+8. Say: "The SLA is a durable timer. Breaching it flags the request; it doesn't cancel it. The task can still be completed, or reassigned, which starts a new SLA for the next person. In production the flag is what you alert on."
+9. **Don't complete or reassign this one.** It's the open v1 request for beat 7.
+10. If asked what happens when a task bounces between people for months: each hand-off adds a few events to the history. A long-lived task would use Continue-As-New to start a fresh history that carries the open task over. This demo doesn't need it.
 
 ### 4. Take the ERP and the worker away
 
