@@ -212,12 +212,12 @@ class DocumentRequestWorkflowTest {
   }
 
   @Test
-  void taskOpensAssignedToAlice() throws Exception {
+  void taskOpensForTheAssigneeTheRulesNamed() throws Exception {
     start(false);
-    fake.route(Route.HUMAN_REVIEW, 1);
+    fake.route(Route.HUMAN_REVIEW, 1, "Dana");
     var wf = begin(doc("h1", "Equipment", "invoice", 3000));
     awaitStep(wf, Steps.HUMAN_TASK);
-    assertEquals("Alice", attr(wf, SearchAttrs.ASSIGNEE));
+    assertEquals("Dana", attr(wf, SearchAttrs.ASSIGNEE));
     assertEquals("h1-t1", attr(wf, SearchAttrs.TASK_ID));
     var deadline = describe(wf).getTypedSearchAttributes().get(SearchAttrs.SLA_DEADLINE);
     assertNotNull(deadline, "the inbox sorts and counts down on SlaDeadline");

@@ -110,8 +110,7 @@ code, .mono { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-
 .toast.warn { background: var(--warn-bg); color: var(--warn); }
 .toast.error { background: var(--danger-bg); color: var(--danger); }
 
-.thresholds { display: flex; flex-direction: column; gap: 6px; margin: 8px 0 10px; }
-.threshold { display: grid; grid-template-columns: minmax(6.5em, max-content) 1fr 96px; align-items: center; gap: 8px; }
-.threshold input { padding: 4px 6px; border: 1px solid var(--border); border-radius: 4px; background: var(--bg); color: var(--text); font: inherit; width: 100%; }
-.threshold input[data-dirty] { border-color: var(--accent); }
+.thresholds { display: grid; grid-template-columns: minmax(6.5em, max-content) minmax(0, 1fr) minmax(0, 1fr); align-items: center; gap: 6px 8px; margin: 8px 0 10px; }
+.thresholds input { padding: 4px 6px; border: 1px solid var(--border); border-radius: 4px; background: var(--bg); color: var(--text); font: inherit; width: 100%; min-width: 0; box-sizing: border-box; }
+.thresholds input[data-dirty] { border-color: var(--accent); }
 .reset { display: flex; flex-direction: column; align-items: flex-start; gap: 4px; margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--border); }

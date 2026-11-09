@@ -20,6 +20,7 @@ import io.temporal.demo.docrouting.model.DocumentRequest;
 import io.temporal.demo.docrouting.model.ErpConfirmation;
 import io.temporal.demo.docrouting.model.ReassignTask;
 import io.temporal.demo.docrouting.model.TaskResult;
+import io.temporal.demo.docrouting.rules.RulesEditor;
 import io.temporal.demo.docrouting.rules.RulesLoader;
 import io.temporal.demo.docrouting.workflow.DocumentRequestWorkflow;
 import io.temporal.demo.docrouting.workflow.SearchAttrs.Steps;
@@ -58,7 +59,7 @@ public final class WebServer {
   private final Config config;
   private final WorkflowClient client;
   private final RulesLoader rules;
-  private final io.temporal.demo.docrouting.rules.RulesEditor rulesEditor;
+  private final RulesEditor rulesEditor;
   private final HttpClient http = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(1)).build();
   private Javalin app;
 
@@ -66,7 +67,7 @@ public final class WebServer {
     this.config = config;
     this.client = client;
     this.rules = rules;
-    this.rulesEditor = new io.temporal.demo.docrouting.rules.RulesEditor(config.rulesFile(), rules);
+    this.rulesEditor = new RulesEditor(config.rulesFile(), rules);
   }
 
   public WebServer start(int port) {
@@ -338,50 +339,61 @@ public final class WebServer {
     }
   }
 
-  // ---- rules card: edit thresholds, reset demo data ------------------------------------------
+  // ---- rules card: edit thresholds and first assignees, reset demo data -----------------------
 
-  /** The version in force, the last rejected edit, and each unit's threshold for the rules card. */
+  /** The version in force, the last rejected edit, and each unit's rules for the rules card. */
   private Map<String, Object> rulesView() {
     RulesLoader.Status status = rules.status();
     Map<String, Object> view = new LinkedHashMap<>();
     view.put("version", status.version());
     view.put("lastRejection", status.lastRejection());
-    Map<String, Long> thresholds = new LinkedHashMap<>();
-    if (status.version() != null) {
-      rules.current().businessUnits().forEach((unit, r) -> thresholds.put(unit, r.humanReviewAbove()));
-    }
-    view.put("thresholds", thresholds);
+    Map<String, RulesLoader.UnitRules> units = new LinkedHashMap<>();
+    if (status.version() != null) units.putAll(rules.current().businessUnits());
+    view.put("units", units);
     return view;
   }
 
-  /** Saves new human-review thresholds as the next rules version: the same file a hand edit changes. */
+  /**
+   * Saves new thresholds and first assignees as the next rules version: the same file a hand edit
+   * changes. Each unit may send either field or both.
+   */
   private void putRules(Context ctx) throws Exception {
-    JsonNode body = JSON.readTree(ctx.body()).path("thresholds");
-    Map<String, Long> thresholds = new LinkedHashMap<>();
+    JsonNode body = JSON.readTree(ctx.body()).path("units");
+    Map<String, RulesEditor.UnitEdit> edits = new LinkedHashMap<>();
     for (var field : body.properties()) {
-      if (!field.getValue().canConvertToLong() || !field.getValue().isIntegralNumber()) {
-        ctx.status(400).json(Map.of("error", field.getKey() + " threshold must be a whole number"));
+      String unit = field.getKey();
+      JsonNode threshold = field.getValue().path("humanReviewAbove");
+      JsonNode assignee = field.getValue().path("firstAssignee");
+      if (!threshold.isMissingNode() && !(threshold.isIntegralNumber() && threshold.canConvertToLong())) {
+        ctx.status(400).json(Map.of("error", unit + " threshold must be a whole number"));
         return;
       }
-      thresholds.put(field.getKey(), field.getValue().asLong());
+      if (!assignee.isMissingNode() && !assignee.isTextual()) {
+        ctx.status(400).json(Map.of("error", unit + " first assignee must be a name"));
+        return;
+      }
+      if (threshold.isMissingNode() && assignee.isMissingNode()) continue;
+      edits.put(unit, new RulesEditor.UnitEdit(
+          threshold.isMissingNode() ? null : threshold.asLong(),
+          assignee.isMissingNode() ? null : assignee.asText()));
     }
-    if (thresholds.isEmpty()) {
-      ctx.status(400).json(Map.of("error", "Nothing to save: send at least one business unit's threshold"));
+    if (edits.isEmpty()) {
+      ctx.status(400).json(Map.of("error", "Nothing to save: send a threshold or first assignee for at least one business unit"));
       return;
     }
     try {
-      var saved = rulesEditor.saveThresholds(thresholds);
-      log.info("Rules card saved version {}: {}", saved.version(), thresholds);
+      var saved = rulesEditor.saveUnits(edits);
+      log.info("Rules card saved version {}: {}", saved.version(), edits);
       ctx.json(rulesView());
-    } catch (io.temporal.demo.docrouting.rules.RulesEditor.InvalidEditException e) {
+    } catch (RulesEditor.InvalidEditException e) {
       ctx.status(400).json(Map.of("error", e.getMessage()));
     }
   }
 
   /** Restores default rules and reference data, and clears the fault toggles. */
   private void resetData(Context ctx) throws Exception {
-    io.temporal.demo.docrouting.rules.RulesEditor.replace(config.defaultRulesFile(), config.rulesFile());
-    io.temporal.demo.docrouting.rules.RulesEditor.replace(config.defaultReferenceDataFile(), config.referenceDataFile());
+    RulesEditor.replace(config.defaultRulesFile(), config.rulesFile());
+    RulesEditor.replace(config.defaultReferenceDataFile(), config.referenceDataFile());
     String faults = "untouched (systems process not running)";
     try {
       http.send(HttpRequest.newBuilder(URI.create(config.systemsUrl() + "/control"))

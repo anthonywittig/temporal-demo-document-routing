@@ -170,41 +170,64 @@ class WebServerTest {
 
   @Test
   void savingAThresholdWritesTheNextRulesVersion() throws Exception {
-    var res = call("PUT", "/api/rules", "{\"thresholds\":{\"Equipment\":5000}}");
+    var res = call("PUT", "/api/rules", "{\"units\":{\"Equipment\":{\"humanReviewAbove\":5000}}}");
     assertEquals(200, res.statusCode(), res.body());
     JsonNode view = JSON.readTree(res.body());
     assertEquals(2, view.get("version").asInt());
-    assertEquals(5000, view.get("thresholds").get("Equipment").asLong());
-    assertEquals(5000, view.get("thresholds").get("Services").asLong(), "untouched unit keeps its threshold");
+    assertEquals(5000, view.get("units").get("Equipment").get("humanReviewAbove").asLong());
+    assertEquals("Alice", view.get("units").get("Equipment").get("firstAssignee").asText(), "unsent field is kept");
+    assertEquals(5000, view.get("units").get("Services").get("humanReviewAbove").asLong(), "untouched unit keeps its threshold");
 
     JsonNode file = rulesFile();
     assertEquals(2, file.get("version").asInt());
     assertEquals(5000, file.get("businessUnits").get("Equipment").get("humanReviewAbove").asLong());
+    assertEquals("Alice", file.get("businessUnits").get("Equipment").get("firstAssignee").asText());
     assertEquals(5000, file.get("businessUnits").get("Services").get("humanReviewAbove").asLong(), "other units are kept");
-
   }
 
   @Test
-  void invalidThresholdIsRefusedAndNothingIsWritten() throws Exception {
+  void savingAFirstAssigneeWritesTheNextRulesVersion() throws Exception {
+    var res = call("PUT", "/api/rules", "{\"units\":{\"Services\":{\"firstAssignee\":\" Carol \"}}}");
+    assertEquals(200, res.statusCode(), res.body());
+    JsonNode view = JSON.readTree(res.body());
+    assertEquals(2, view.get("version").asInt());
+    assertEquals("Carol", view.get("units").get("Services").get("firstAssignee").asText());
+    assertEquals(5000, view.get("units").get("Services").get("humanReviewAbove").asLong(), "unsent field is kept");
+    assertEquals("Alice", view.get("units").get("Equipment").get("firstAssignee").asText());
+
+    JsonNode file = rulesFile();
+    assertEquals("Carol", file.get("businessUnits").get("Services").get("firstAssignee").asText());
+    assertEquals("Alice", file.get("businessUnits").get("Equipment").get("firstAssignee").asText());
+  }
+
+  @Test
+  void invalidEditIsRefusedAndNothingIsWritten() throws Exception {
     String before = Files.readString(dir.resolve("rules.json"));
-    var negative = call("PUT", "/api/rules", "{\"thresholds\":{\"Services\":-5}}");
+    var negative = call("PUT", "/api/rules", "{\"units\":{\"Services\":{\"humanReviewAbove\":-5}}}");
     assertEquals(400, negative.statusCode());
     assertTrue(negative.body().contains("must not be negative"), negative.body());
 
-    var text = call("PUT", "/api/rules", "{\"thresholds\":{\"Services\":\"lots\"}}");
+    var text = call("PUT", "/api/rules", "{\"units\":{\"Services\":{\"humanReviewAbove\":\"lots\"}}}");
     assertEquals(400, text.statusCode());
     assertTrue(text.body().contains("whole number"), text.body());
 
-    var unknown = call("PUT", "/api/rules", "{\"thresholds\":{\"BU9\":10}}");
+    var blank = call("PUT", "/api/rules", "{\"units\":{\"Services\":{\"firstAssignee\":\"  \"}}}");
+    assertEquals(400, blank.statusCode());
+    assertTrue(blank.body().contains("firstAssignee is required"), blank.body());
+
+    var unknown = call("PUT", "/api/rules", "{\"units\":{\"BU9\":{\"humanReviewAbove\":10}}}");
     assertEquals(400, unknown.statusCode());
+
+    var empty = call("PUT", "/api/rules", "{\"units\":{}}");
+    assertEquals(400, empty.statusCode());
 
     assertEquals(before, Files.readString(dir.resolve("rules.json")));
   }
 
   @Test
   void resetRestoresDefaultRulesAndReferenceData() throws Exception {
-    call("PUT", "/api/rules", "{\"thresholds\":{\"Equipment\":5000}}");
-    call("PUT", "/api/rules", "{\"thresholds\":{\"Services\":2000}}");
+    call("PUT", "/api/rules", "{\"units\":{\"Equipment\":{\"humanReviewAbove\":5000}}}");
+    call("PUT", "/api/rules", "{\"units\":{\"Services\":{\"firstAssignee\":\"Carol\"}}}");
     Files.writeString(dir.resolve("reference-data.json"), "{\"costCenters\":[\"CC-10\",\"CC-99\"]}");
     assertEquals(3, rulesFile().get("version").asInt());
 

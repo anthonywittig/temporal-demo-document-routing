@@ -226,21 +226,30 @@ function renderRules(rules) {
 let rulesCardVersion = null;
 
 // Fields are rebuilt only when the rules version changes and nothing is being edited, so a
-// threshold being typed survives polls.
+// threshold or name being typed survives polls.
 function renderRulesCard(rules) {
   $("rules-card-version").textContent = rules.version ? `v${rules.version}` : "none";
   const box = $("thresholds");
   const dirty = box.querySelector("input[data-dirty]");
   if (rules.version !== rulesCardVersion && !dirty) {
     rulesCardVersion = rules.version;
-    box.replaceChildren(...Object.entries(rules.thresholds || {}).map(([unit, value]) => {
-      const input = el("input", { type: "number", min: "0", step: "1", value, "data-unit": unit, "aria-label": `${unit} human review above` });
+    const field = (unit, name, attrs, label) => {
+      const input = el("input", { ...attrs, "data-unit": unit, "data-field": name, "aria-label": `${unit} ${label}` });
       input.addEventListener("input", () => {
         input.dataset.dirty = "1";
         updateSaveButton();
       });
-      return el("label", { class: "threshold" }, el("span", {}, unit), el("span", { class: "muted small" }, "human review above $"), input);
-    }));
+      return input;
+    };
+    const rows = Object.entries(rules.units || {}).map(([unit, r]) => [
+      el("span", {}, unit),
+      field(unit, "humanReviewAbove", { type: "number", min: "0", step: "1", value: r.humanReviewAbove }, "human review above"),
+      field(unit, "firstAssignee", { type: "text", value: r.firstAssignee ?? "", autocomplete: "off" }, "first assignee"),
+    ]);
+    box.replaceChildren(
+      ...(rows.length ? [el("span"), el("span", { class: "muted small" }, "Review above $"), el("span", { class: "muted small" }, "First assignee")] : []),
+      ...rows.flat(),
+    );
   }
   updateSaveButton();
 }
@@ -253,15 +262,25 @@ function updateSaveButton() {
 }
 
 async function saveRules() {
-  const thresholds = {};
-  for (const input of $("thresholds").querySelectorAll("input")) {
-    if (input.value.trim() === "" || !/^-?\d+$/.test(input.value.trim())) {
-      toast(`${input.dataset.unit} threshold must be a whole number`, "error");
-      return;
+  const units = {};
+  for (const input of $("thresholds").querySelectorAll("input[data-dirty]")) {
+    const { unit, field } = input.dataset;
+    const value = input.value.trim();
+    if (field === "humanReviewAbove") {
+      if (!/^-?\d+$/.test(value)) {
+        toast(`${unit} threshold must be a whole number`, "error");
+        return;
+      }
+      (units[unit] ??= {}).humanReviewAbove = Number(value);
+    } else {
+      if (value === "") {
+        toast(`${unit} needs a first assignee`, "error");
+        return;
+      }
+      (units[unit] ??= {}).firstAssignee = value;
     }
-    thresholds[input.dataset.unit] = Number(input.value);
   }
-  const { ok, data } = await api("PUT", "/api/rules", { thresholds });
+  const { ok, data } = await api("PUT", "/api/rules", { units });
   if (!ok) {
     toast(data?.error || "Rules not saved", "error");
     return;

@@ -2,7 +2,7 @@
 
 A document arrives, is classified, and business-unit rules route it down one of three paths:
 
-- **`HumanReview`.** A person finishes the request. Every task starts with Alice; whoever holds it can complete it, which notifies the requester and ends the request, or reassign it to anyone by name. Each assignment has its own SLA.
+- **`HumanReview`.** A person finishes the request. The first task goes to the business unit's first assignee from the rules (Alice by default); whoever holds it can complete it, which notifies the requester and ends the request, or reassign it to anyone by name. Each assignment has its own SLA.
 - **`Invoice`.** The invoice is posted to the ERP, which confirms the posting asynchronously, and the requester is notified.
 - **`PurchaseOrder`.** Budget is reserved against the purchase order's cost center, which fails without retrying if the cost center is unknown, and the PO is sent to the supplier portal. If the supplier rejects it, the budget reservation is released.
 
@@ -37,7 +37,7 @@ make worker     # the Temporal worker (version v1)
 
 The worker runs on its own because the demo stops and restarts it. To run the other three in separate terminals instead, use `make temporal`, `make systems` and `make web`.
 
-The first `make up` or `make worker` copies the default rules and reference data into `data/`. Those copies are what changes live during the demo. The page's **Routing rules** card edits the per-unit thresholds in `data/rules.json`, and you can edit the file by hand too. **Reset demo data** on the page, or `make reset-data`, restores the defaults; the page button also clears the system fault toggles. The rules hold only those thresholds. Below its unit's threshold, a document's path follows from its type: invoices go to `Invoice` and purchase orders to `PurchaseOrder`. Any other type fails at `EvaluateRules` without retrying, before it reaches a reviewer.
+The first `make up` or `make worker` copies the default rules and reference data into `data/`. Those copies are what changes live during the demo. The page's **Routing rules** card edits each unit's threshold and first assignee in `data/rules.json`, and you can edit the file by hand too. **Reset demo data** on the page, or `make reset-data`, restores the defaults; the page button also clears the system fault toggles. The rules hold only those two settings per unit. Above its unit's threshold, a document goes to a person, starting with the unit's first assignee. Below it, a document's path follows from its type: invoices go to `Invoice` and purchase orders to `PurchaseOrder`. Any other type fails at `EvaluateRules` without retrying, before it reaches a reviewer.
 
 The dev server keeps everything in memory. Stopping it clears every request.
 
