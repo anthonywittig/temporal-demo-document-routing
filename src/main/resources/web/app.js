@@ -90,7 +90,7 @@ function slaCell(task) {
   return el("span", { class: left <= 15 ? "pill warn" : "pill" }, `${m}:${s} left`);
 }
 
-// Complete and Reassign are Updates on the request. The action is credited to the task's assignee.
+// Complete is an Update on the request and Reassign a Signal. The action is credited to the task's assignee.
 async function taskAction(path, body, buttons) {
   buttons.forEach((b) => (b.disabled = true));
   const { ok, data } = await api("POST", path, body);

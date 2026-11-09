@@ -45,9 +45,9 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * The demo page's backend. It starts requests, relays Complete and Reassign on human tasks as Updates, turns
- * the ERP's confirmation callbacks into Signals, and reads everything it shows from Temporal visibility,
- * so the page keeps working while no worker is running.
+ * The demo page's backend. It starts requests, relays Complete on a human task as an Update and Reassign
+ * as a Signal, turns the ERP's confirmation callbacks into Signals, and reads everything it shows from
+ * Temporal visibility, so the page keeps working while no worker is running.
  */
 public final class WebServer {
   private static final Logger log = LoggerFactory.getLogger(WebServer.class);
@@ -164,7 +164,7 @@ public final class WebServer {
     return "D" + Integer.toString(0x10000 + RANDOM.nextInt(0xEFFFF), 36).toUpperCase();
   }
 
-  // ---- human tasks: Complete and Reassign, relayed as Updates ---------------------------------
+  // ---- human tasks: Complete as an Update, Reassign as a Signal -------------------------------
 
   private void completeTask(Context ctx) throws Exception {
     JsonNode body = JSON.readTree(ctx.body());
@@ -180,7 +180,15 @@ public final class WebServer {
       return;
     }
     ReassignTask action = new ReassignTask(body.path("taskId").asText(), assignee, body.path("comment").asText(""));
-    sendTaskUpdate(ctx, body.path("workflowId").asText(), wf -> wf.reassign(action));
+    try {
+      client.newWorkflowStub(DocumentRequestWorkflow.class, body.path("workflowId").asText()).reassign(action);
+    } catch (WorkflowNotFoundException e) {
+      ctx.status(404).json(Map.of("error", "This request has finished; the task is no longer open"));
+      return;
+    }
+    // The Signal is in the history now, worker or not. Whether it applied shows in the inbox: the
+    // workflow ignores a Reassign for a task that's no longer open.
+    ctx.json(Map.of("taskId", action.taskId(), "message", "Reassign to " + assignee));
   }
 
   private void sendTaskUpdate(Context ctx, String workflowId, Function<DocumentRequestWorkflow, TaskResult> update)
