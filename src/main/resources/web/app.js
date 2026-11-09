@@ -108,9 +108,18 @@ function complete(task, commentInput, buttons) {
     { workflowId: task.workflowId, taskId: task.taskId, comment: commentInput.value }, buttons);
 }
 
+// A blank box hands the task to the suggested person, if there is one.
 function reassign(task, assigneeInput, commentInput, buttons) {
+  const assignee = assigneeInput.value.trim() || suggestedReassignee(task.assignee) || "";
   taskAction("/api/tasks/reassign",
-    { workflowId: task.workflowId, taskId: task.taskId, assignee: assigneeInput.value.trim(), comment: commentInput.value }, buttons);
+    { workflowId: task.workflowId, taskId: task.taskId, assignee, comment: commentInput.value }, buttons);
+}
+
+// The demo's two people hand tasks to each other, so suggest the other one. No suggestion for anyone else.
+function suggestedReassignee(assignee) {
+  if (assignee === "Bob") return "Alice";
+  if (assignee === "Alice") return "Bob";
+  return null;
 }
 
 let inboxSignature = "";
@@ -134,7 +143,7 @@ function renderInbox(inbox) {
   }
   body.replaceChildren(...inbox.map((t) => {
     const comment = el("input", { class: "comment", placeholder: "comment (optional)" });
-    const to = el("input", { class: "assignee", placeholder: "Bob", size: 8, "aria-label": "Reassign to" });
+    const to = el("input", { class: "assignee", placeholder: suggestedReassignee(t.assignee) ?? "name", size: 8, "aria-label": "Reassign to" });
     const done = el("button", { class: "button small", title: "Finish the task; the request completes" }, "Complete");
     const hand = el("button", { class: "button small ghost", title: "Hand the task to the person named" }, "Reassign");
     done.addEventListener("click", () => complete(t, comment, [done, hand]));

@@ -32,6 +32,8 @@ class RulesLoaderTest {
   @Test
   void committedDefaultsAreValid() {
     assertEquals(1, loader.current().version());
+    assertEquals("Alice", loader.current().businessUnits().get("Services").firstAssignee());
+    assertEquals("Bob", loader.current().businessUnits().get("Equipment").firstAssignee());
     assertNull(loader.status().lastRejection());
   }
 
