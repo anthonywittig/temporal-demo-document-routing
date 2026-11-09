@@ -172,7 +172,7 @@ public class DocumentRequestWorkflowImpl implements DocumentRequestWorkflow {
   // ---- PurchaseOrder: budget reservation, purchase order, compensation -------------------------
 
   private RequestOutcome purchaseOrder(DocumentRequest doc, RoutingDecision route) {
-    Saga saga = new Saga(new Saga.Options.Builder().setParallelCompensation(false).build());
+    Saga saga = new Saga(new Saga.Options.Builder().build());
 
     Workflow.upsertTypedSearchAttributes(STEP.valueSet(Steps.RESERVE_BUDGET));
     activities.reserveBudget(doc);
