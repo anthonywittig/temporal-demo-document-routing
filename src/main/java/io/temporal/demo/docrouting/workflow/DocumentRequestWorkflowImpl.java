@@ -72,9 +72,9 @@ public class DocumentRequestWorkflowImpl implements DocumentRequestWorkflow {
 
       switch (route.path()) {
         case HUMAN_REVIEW -> {
-          ReviewDecision review = humanTask(doc, route, round);
-          if (review.action() == ReviewAction.REJECT) {
-            return rejectedByReviewer(doc, route, review);
+          humanReview(doc, route, round);
+          if (!humanReviewApproved()) {
+            return rejectedByReviewer(doc, route);
           }
         }
         case INVOICE -> {
@@ -89,7 +89,7 @@ public class DocumentRequestWorkflowImpl implements DocumentRequestWorkflow {
 
   // ---- HumanReview: a person approves or rejects the cost -----------------------------------
 
-  private ReviewDecision humanTask(DocumentRequest doc, RoutingDecision route, int round) {
+  private void humanReview(DocumentRequest doc, RoutingDecision route, int round) {
     openTaskId = doc.documentId() + "-r" + round;
     humanReviewDecision = null;
     Instant deadline = Instant.ofEpochMilli(Workflow.currentTimeMillis()).plus(settings.slaDuration());
@@ -112,7 +112,6 @@ public class DocumentRequestWorkflowImpl implements DocumentRequestWorkflow {
 
     Workflow.await(() -> humanReviewDecision != null);
     sla.cancel();
-    return humanReviewDecision;
   }
 
   private boolean humanReviewApproved() {
@@ -140,11 +139,12 @@ public class DocumentRequestWorkflowImpl implements DocumentRequestWorkflow {
   }
 
   /** The reviewer turned the request down: tell the requester and end, with nothing else to undo. */
-  private RequestOutcome rejectedByReviewer(DocumentRequest doc, RoutingDecision route, ReviewDecision review) {
-    activities.notifyRequester(new NotifyRequesterInput(doc, "rejected by " + review.reviewer()));
+  private RequestOutcome rejectedByReviewer(DocumentRequest doc, RoutingDecision route) {
+    String reviewer = humanReviewDecision.reviewer();
+    activities.notifyRequester(new NotifyRequesterInput(doc, "rejected by " + reviewer));
     Workflow.upsertTypedSearchAttributes(STEP.valueSet(Steps.REJECTED));
     return new RequestOutcome(RequestOutcome.REJECTED, route.path(), route.rulesVersion(),
-        "Rejected by " + review.reviewer());
+        "Rejected by " + reviewer);
   }
 
   // ---- Invoice: ERP posting, asynchronous confirmation, notification ------------------------
