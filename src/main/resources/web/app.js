@@ -117,6 +117,13 @@ let inboxSignature = "";
 
 // Rows are rebuilt only when the set of tasks changes, so a comment being typed survives polls;
 // otherwise only the SLA cells are refreshed.
+// The demo's two people hand tasks to each other, so suggest the other one.
+function suggestedReassignee(assignee) {
+  if (assignee === "Bob") return "Alice";
+  if (assignee === "Alice") return "Bob";
+  return "name";
+}
+
 function renderInbox(inbox) {
   const body = $("inbox");
   const signature = inbox.map((t) => `${t.taskId}:${t.slaBreached}`).join("|");
@@ -134,7 +141,7 @@ function renderInbox(inbox) {
   }
   body.replaceChildren(...inbox.map((t) => {
     const comment = el("input", { class: "comment", placeholder: "comment (optional)" });
-    const to = el("input", { class: "assignee", placeholder: "name", size: 8, "aria-label": "Reassign to" });
+    const to = el("input", { class: "assignee", placeholder: suggestedReassignee(t.assignee), size: 8, "aria-label": "Reassign to" });
     const done = el("button", { class: "button small", title: "Finish the task; the request completes" }, "Complete");
     const hand = el("button", { class: "button small ghost", title: "Hand the task to the person named" }, "Reassign");
     done.addEventListener("click", () => complete(t, comment, [done, hand]));
