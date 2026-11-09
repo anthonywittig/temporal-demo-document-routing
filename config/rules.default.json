@@ -2,10 +2,12 @@
   "version": 1,
   "businessUnits": {
     "Services": {
-      "humanReviewAbove": 5000
+      "humanReviewAbove": 5000,
+      "firstAssignee": "Alice"
     },
     "Equipment": {
-      "humanReviewAbove": 1000
+      "humanReviewAbove": 1000,
+      "firstAssignee": "Alice"
     }
   }
 }

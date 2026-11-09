@@ -45,9 +45,9 @@ public class DocumentRequestWorkflowImpl implements DocumentRequestWorkflow {
   private final DocumentActivities activities =
       Workflow.newActivityStub(DocumentActivities.class, ACTIVITY_OPTIONS);
 
-  // The open human task. Each assignment is a new task ID; Complete or Reassign is accepted only
-  // for the open one, and the human-task loop acts on whichever arrives.
-  static final String FIRST_ASSIGNEE = "Alice";
+  // The open human task. The first goes to the assignee the rules named; each assignment is a new
+  // task ID. Complete or Reassign is accepted only for the open one, and the human-task loop acts
+  // on whichever arrives.
   private String openTaskId;
   private String assignee;
   private boolean completed;
@@ -84,7 +84,7 @@ public class DocumentRequestWorkflowImpl implements DocumentRequestWorkflow {
   // ---- HumanReview: a person finishes the request, or hands it to someone else --------------
 
   private RequestOutcome humanReview(DocumentRequest doc, RoutingDecision route) {
-    assignee = FIRST_ASSIGNEE;
+    assignee = route.assignee();
     for (int n = 1; !completed; n++) {
       humanTask(doc.documentId() + "-t" + n);
       if (reassignTo != null) assignee = reassignTo;
