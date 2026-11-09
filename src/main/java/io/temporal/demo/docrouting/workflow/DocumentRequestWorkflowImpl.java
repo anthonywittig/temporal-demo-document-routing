@@ -67,7 +67,7 @@ public class DocumentRequestWorkflowImpl implements DocumentRequestWorkflow {
         BUSINESS_UNIT.valueSet(doc.businessUnit()), COST.valueSet(doc.cost()), COST_CENTER.valueSet(doc.costCenter()));
 
     Workflow.upsertTypedSearchAttributes(STEP.valueSet(Steps.CLASSIFY));
-    String docType = activities.classify(doc);
+    String docType = activities.classify(doc).docType();
 
     Workflow.upsertTypedSearchAttributes(DOC_TYPE.valueSet(docType), STEP.valueSet(Steps.EVALUATE_RULES));
     RoutingDecision route = activities.evaluateRules(new EvaluateRulesInput(doc, docType));
