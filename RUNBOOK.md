@@ -116,10 +116,10 @@ Thirty-second version: "A document comes in, is classified, and business-unit ru
 
    There's no ERP posting: the person's decision is the end of this path.
 5. Say: "The human task is the path. The workflow waited durably for a person, seconds here and days in production, and each hand-off is in the history: who had it, who it went to, and who finished it. Each assignment has its own SLA, so a breach means the person holding it now is late."
-6. Optional, to show that who gets the work is a rule too: in the **Routing rules** card, set Services' **First assignee** to `Carol` and click **Save as v3**. Then click **Services · invoice · $12,000**. It lands under **Human tasks**, assigned to Alice (Carol if you made the change), above the Services threshold of 5000. Click **Waiting on a person** under **Temporal UI views** to show the same list in the Temporal UI.
-7. Let the SLA run out while you talk (60 seconds by default). The row turns red with **SLA breached**. In the Temporal UI, **SLA breached** lists it, and the request's timeline shows the fired `ReviewSla` (1m) timer.
+6. Click **Services · invoice · $12,000**. It lands under **Human tasks**, assigned to **Alice**, because it's above the Services threshold of 5000. Click **Waiting on a person** under **Temporal UI views** to show the same list in the Temporal UI.
+7. Let the SLA on the Services $12,000 request run out while you talk (60 seconds by default). The row turns red with **SLA breached**. In the Temporal UI, **SLA breached** lists it, and the request's timeline shows the fired `ReviewSla` (1m) timer.
 8. Say: "The SLA is a durable timer. Breaching it flags the request; it doesn't cancel it. The task can still be completed, or reassigned, which starts a new SLA for the next person. In production the flag is what you alert on."
-9. **Don't complete or reassign this one.** It's the open v1 request for beat 7.
+9. **Don't complete or reassign the Services $12,000 request.** It's still running on worker v1, and beat 7 finishes it.
 10. If asked what happens when a task bounces between people for months: each hand-off adds a few events to the history. A long-lived task would use Continue-As-New to start a fresh history that carries the open task over. This demo doesn't need it.
 
 ### 4. Take the ERP and the worker away
@@ -193,7 +193,7 @@ Thirty-second version: "A document comes in, is classified, and business-unit ru
 
 ### 7. Ship v2 while v1 requests are still open
 
-The Services $12,000 request from beat 3 should still be open under **Human tasks**, on v1.
+The Services $12,000 request from beat 3 should still be open under **Human tasks**, on worker v1.
 
 1. In the third terminal: `make worker BUILD_ID=v2`. It starts polling. v1 is still current, so new requests still go to v1.
 2. `make promote BUILD_ID=v2`. It prints "Successfully set the current worker deployment version".
