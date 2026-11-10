@@ -32,7 +32,8 @@ import org.junit.jupiter.params.provider.ValueSource;
 
 /**
  * Guards determinism: recorded v1 histories, one per path, must replay against the current
- * Workflow code configured as v1. A change that would break in-flight v1 requests fails here.
+ * Workflow code configured as v1, and as v2. A change that would break in-flight v1 requests, on
+ * either version, fails here.
  *
  * <p>To re-record the fixtures (only when v1 behavior is meant to change):
  * {@code mvn test -Dtest=HistoryReplayTest -Drecord=true}
@@ -59,13 +60,15 @@ class HistoryReplayTest {
   }
 
   /**
-   * v2 adds an archive step, so it can't replay a v1 history. That's why every request is pinned
-   * to the version it started on: v1 requests drain on v1 workers instead of moving to v2 code.
+   * v2 adds an archive step behind a version marker, so v2 code replays every v1 history too.
+   * That's what makes it safe to move a running v1 request onto v2 (make migrate). Pinning stays
+   * the default; moving is an operator's choice.
    */
-  @Test
-  void v2CodeCannotReplayV1History() throws Exception {
+  @ParameterizedTest
+  @ValueSource(strings = {"v1-human-review.json", "v1-invoice.json", "v1-purchase-order-rejected.json"})
+  void v1HistoriesReplayAgainstV2Code(String fixture) throws Exception {
     String json;
-    try (InputStream in = getClass().getResourceAsStream("/histories/v1-invoice.json")) {
+    try (InputStream in = getClass().getResourceAsStream("/histories/" + fixture)) {
       json = new String(in.readAllBytes(), StandardCharsets.UTF_8);
     }
     WorkflowSettings v2 = new WorkflowSettings(V1.slaDuration(), V1.callbackTimeout(), true);
@@ -73,8 +76,7 @@ class HistoryReplayTest {
       Worker worker = env.newWorker(QUEUE);
       worker.registerWorkflowImplementationFactory(
           DocumentRequestWorkflow.class, () -> new DocumentRequestWorkflowImpl(v2));
-      assertThrows(Exception.class,
-          () -> WorkflowReplayer.replayWorkflowExecution(WorkflowExecutionHistory.fromJson(json), worker));
+      WorkflowReplayer.replayWorkflowExecution(WorkflowExecutionHistory.fromJson(json), worker);
     }
   }
 

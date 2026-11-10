@@ -5,6 +5,7 @@
 #
 #   make worker BUILD_ID=v2   # start a second, newer worker version
 #   make promote BUILD_ID=v2  # make v2 current: new requests go to v2
+#   make migrate              # move running requests from v1 to v2 (FROM=v1 BUILD_ID=v2)
 #   make stop-systems         # take every mock system down (beat 5's harder outage)
 #   make reset-data           # restore default rules, reference data
 #
@@ -44,7 +45,7 @@ SEARCH_ATTRIBUTES := \
 CLASSPATH_FILE := target/classpath.txt
 RUN := java -cp target/classes:$$(cat $(CLASSPATH_FILE))
 
-.PHONY: up temporal systems stop-systems worker web promote reset-data test build data
+.PHONY: up temporal systems stop-systems worker web promote migrate reset-data test build data
 
 TEMPORAL_START := temporal server start-dev $(TEMPORAL_FLAGS) --ip 127.0.0.1 $(SEARCH_ATTRIBUTES)
 SYSTEMS_START := $(RUN) $(PKG).systems.SystemsMain
@@ -93,6 +94,29 @@ web: data build
 promote:
 	temporal worker deployment set-current-version $(TEMPORAL_FLAGS) \
 		--deployment-name $(DEPLOYMENT) --build-id $(BUILD_ID) --yes
+
+# Pins every running request on FROM to the new version, as one batch with a reason. The new
+# version's code must replay the old histories (see HistoryReplayTest). Requests not moved stay
+# on the version they started on. The batch runs asynchronously, so this waits until no running
+# request matches FROM any more. BUILD_ID means v2 here unless given on the command line.
+FROM ?= v1
+migrate: MIGRATE_TO = $(if $(filter command line,$(origin BUILD_ID)),$(BUILD_ID),v2)
+migrate:
+	@q='TemporalWorkerDeploymentVersion="$(DEPLOYMENT):$(FROM)" AND ExecutionStatus="Running"'; \
+	n=$$(temporal workflow count $(TEMPORAL_FLAGS) --query "$$q" | awk '/Total:/{print $$2}'); \
+	if [ "$${n:-0}" = 0 ]; then echo "Nothing to migrate: no running requests on $(FROM)"; exit 0; fi; \
+	echo "Moving $$n running request(s) from $(FROM) to $(MIGRATE_TO)"; \
+	temporal workflow update-options $(TEMPORAL_FLAGS) --query "$$q" \
+		--versioning-override-behavior pinned \
+		--versioning-override-deployment-name $(DEPLOYMENT) \
+		--versioning-override-build-id $(MIGRATE_TO) \
+		--reason "Migrate running requests from $(FROM) to $(MIGRATE_TO)" --yes; \
+	for i in $$(seq 1 60); do \
+		left=$$(temporal workflow count $(TEMPORAL_FLAGS) --query "$$q" | awk '/Total:/{print $$2}'); \
+		if [ "$${left:-0}" = 0 ]; then echo "Moved $$n request(s) from $(FROM) to $(MIGRATE_TO)"; exit 0; fi; \
+		sleep 1; \
+	done; \
+	echo "The batch is still running; check it with: temporal batch list $(TEMPORAL_FLAGS)"; exit 1
 
 build: $(CLASSPATH_FILE)
 	$(MVN) compile

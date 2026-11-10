@@ -77,9 +77,9 @@ Thirty-second version: "A document comes in, is classified, and business-unit ru
 | 4. Take the ERP and the worker away | 8 | |
 | 5. The supplier says no; the budget is released | 7 | |
 | 6. Bad data: find, fix, replay in bulk | 10 | |
-| 7. Ship v2 while v1 requests are still open | 10 | |
+| 7. Ship v2 while v1 requests are still open; move one across | 12 | yes: skip steps 7 to 10, and complete the second request on v1 too |
 | 8. The operations view | 7 | yes, show only two filters |
-| **Total** | **68** | leaves about 20 minutes for questions |
+| **Total** | **70** | leaves about 20 minutes for questions |
 
 ### 1. A document is posted to the ERP
 
@@ -191,23 +191,27 @@ Thirty-second version: "A document comes in, is classified, and business-unit ru
 
     Keep `ExecutionStatus="Failed"` in the reset query. Without it, the query also matches any completed run those documents have, and the reset replays that too.
 
-### 7. Ship v2 while v1 requests are still open
+### 7. Ship v2 while v1 requests are still open; move one across
 
-The Services $12,000 request from beat 3 should still be open under **Human tasks**, on worker v1.
+The Services $12,000 request from beat 3 should still be open under **Human tasks**, on worker v1. Call it the first request.
 
-1. In the third terminal: `make worker BUILD_ID=v2`. It starts polling. v1 is still current, so new requests still go to v1.
-2. `make promote BUILD_ID=v2`. It prints "Successfully set the current worker deployment version".
-3. Click **Services · invoice · $3,000**. Its row shows version **v2**. In the Temporal UI, its history ends with an `ArchiveDocument` step that v1 doesn't have.
-4. Under **Human tasks**, click **Complete** on the open $12,000 request. It finishes on v1 code. Its row shows **v1**, and its history has no `ArchiveDocument` step.
-5. Say: "Two versions of the workflow ran side by side. Each request is pinned to the version it started on. v2 adds a step, and replaying an old history against new code is exactly what breaks naïve deploys. Old requests finish on old code, new requests get new code, and nobody had to stop anything."
-6. Show it draining:
+1. Click **Services · invoice · $12,000** again. v1 is still current, so this second request also opens on v1, assigned to Alice. Both rows show version **v1**.
+2. In the third terminal: `make worker BUILD_ID=v2`. It starts polling. v1 is still current, so new requests still go to v1.
+3. `make promote BUILD_ID=v2`. It prints "Successfully set the current worker deployment version".
+4. Click **Services · invoice · $3,000**. Its row shows version **v2**. In the Temporal UI, its history ends with an `ArchiveDocument` step that v1 doesn't have.
+5. Under **Human tasks**, click **Complete** on the first $12,000 request. It finishes on v1 code. Its row shows **v1**, and its history has no `ArchiveDocument` step.
+6. Say: "Two versions of the workflow ran side by side. Each request is pinned to the version it started on. Old requests finish on old code, new requests get new code, and nobody had to stop anything. That's the safe default. But sometimes you want an open request on the new code: a hotfix, or a request that will wait for weeks."
+7. In the third terminal: `make migrate`. It prints "Moving 1 running request(s) from v1 to v2" and starts a batch, selected by query like beat 6's reset and carrying a reason. Batches run asynchronously; after a few seconds it prints "Moved 1 request(s) from v1 to v2", and the second request's row switches to **v2**.
+8. Say: "That's a batch operation on running requests. Here it's every request still on v1, but the query could pick one business unit or one document. v2 was written to replay v1 histories, and a test proves it on every build, so moving them is safe. Requests we don't move stay where they are."
+9. Under **Human tasks**, click **Complete** on the second request. It finishes on v2 code. Open it in the Temporal UI: its history ends with a version marker (`MarkerRecorded`) and `ArchiveDocument`. It started on v1, and the step it hadn't reached yet ran on v2's code.
+10. Say: "The marker is how v2 stays compatible. A history from before v2 has no marker at that point, so v2 code replays it without the new step. A request that reaches that point on v2 records the marker and gets the new step. Whether a running request moves is a decision you make per request, per change."
+11. Show v1 draining:
 
-   ```sh
-   temporal worker deployment describe --name document-routing --disable-config-file
-   ```
+    ```sh
+    temporal worker deployment describe --name document-routing --disable-config-file
+    ```
 
-   v1 shows `draining`, and after a few minutes `drained`. Then `Ctrl-C` the v1 worker.
-7. Say: "Here we waited for v1 to drain. If a v1 request were going to wait for weeks, you can also move it onto the new version, as long as the new code is written to replay the old history. That's a decision per change, not a platform limitation."
+    v1 shows `draining`, and after a few minutes `drained`: nothing open is on v1 any more. Then `Ctrl-C` the v1 worker.
 
 ### 8. The operations view
 
@@ -346,7 +350,26 @@ WorkerDeploymentOptions.newBuilder()
     .setDefaultVersioningBehavior(VersioningBehavior.PINNED)
 ```
 
-[`HistoryReplayTest.java`](src/test/java/io/temporal/demo/docrouting/workflow/HistoryReplayTest.java) replays recorded v1 histories against the current code on every build. It also proves that v2 code *can't* replay a v1 history, which is why v1 requests are pinned.
+[`HistoryReplayTest.java`](src/test/java/io/temporal/demo/docrouting/workflow/HistoryReplayTest.java) replays recorded v1 histories against the current code, configured as v1 and as v2, on every build.
+
+### Move a running request to the new version
+
+v2's extra step is guarded by a version marker, so v2 code replays every v1 history ([`DocumentRequestWorkflowImpl.java` lines 205–212](src/main/java/io/temporal/demo/docrouting/workflow/DocumentRequestWorkflowImpl.java#L205-L212)):
+
+```java
+if (settings.archiveDocuments()
+    && Workflow.getVersion("ArchiveDocument", Workflow.DEFAULT_VERSION, 1) == 1) {
+  activities.archiveDocument(doc);   // a v1 history has no marker here, so replay skips it
+}
+```
+
+`make migrate` ([`Makefile` lines 98–119](Makefile#L98-L119)) moves every running request on v1 to v2 as one batch, with a reason, and waits until the batch has moved them:
+
+```sh
+temporal workflow update-options --query 'TemporalWorkerDeploymentVersion="document-routing:v1" AND ExecutionStatus="Running"' \
+  --versioning-override-behavior pinned --versioning-override-deployment-name document-routing \
+  --versioning-override-build-id v2 --reason "Migrate running requests from v1 to v2" --yes
+```
 
 ### What's demo-only
 
@@ -359,7 +382,6 @@ WorkerDeploymentOptions.newBuilder()
 - **The web app is not a product UI.** It has no sign-in, no roles and no SSO; anyone can complete or reassign any task, and the action is credited to the person it's assigned to. Role-based access and SSO are Temporal Cloud and application concerns, covered in the documentation.
 - **Payload encryption is off.** Temporal's Data Converter encrypts payloads before they leave the worker, with your keys (one per customer if needed), so the service never sees document data. Not shown here.
 - **Metrics and dashboards aren't wired up.** The SDK emits OpenTelemetry metrics (activity and workflow latencies, failures, task backlogs) that go to whatever metrics and alerting stack you already use (Prometheus and Grafana, Datadog and so on).
-- **Draining is the only migration shown.** Moving in-flight requests to a new version (with the new code guarded so it replays old histories) is supported but not demonstrated.
 - **`Retry-After` is ignored.** A 429 is retried like any other transient failure. An Activity can set the next retry delay from the header when an API needs it.
 - **Correcting data inside a running request isn't shown.** Here the fix is in the cost-center reference data, followed by a replay. A workflow can also accept corrected data through an Update.
 - **Scale isn't shown.** One local dev server and one worker. Thousands of requests a day are small for Temporal Cloud.

@@ -6,7 +6,7 @@ A document arrives, is classified, and business-unit rules route it down one of 
 - **`Invoice`.** The invoice is posted to the ERP, which confirms the posting asynchronously, and the requester is notified.
 - **`PurchaseOrder`.** Budget is reserved against the purchase order's cost center, which fails without retrying if the cost center is unknown, and the PO is sent to the supplier portal. If the supplier rejects it, the budget reservation is released.
 
-Each document is one Temporal Workflow. You can stop the worker, take the external systems down, change routing rules live, and ship a new worker version while requests are in flight, and nothing is lost or done twice.
+Each document is one Temporal Workflow. You can stop the worker, take the external systems down, change routing rules live, and ship a new worker version while requests are in flight, either leaving them on the version they started on or moving them across, and nothing is lost or done twice.
 
 The [RUNBOOK](RUNBOOK.md) is the presenter's script.
 

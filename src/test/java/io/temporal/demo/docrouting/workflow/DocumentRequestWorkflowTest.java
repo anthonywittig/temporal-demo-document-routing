@@ -370,5 +370,22 @@ class DocumentRequestWorkflowTest {
     result(wf);
     assertEquals("ArchiveDocument", fake.calls().get(fake.calls().size() - 1));
     assertEquals(Steps.COMPLETED, step(wf));
+    assertEquals(1, versionMarkers("v2"), "v2 records the ArchiveDocument version marker");
+  }
+
+  @Test
+  void v1RecordsNoVersionMarker() {
+    start(false);
+    fake.route(Route.INVOICE, 1);
+    var wf = begin(doc("v1m", "Services", "invoice", 3000));
+    wf.erpPostingConfirmed(new ErpConfirmation("A-test", "now"));
+    result(wf);
+    assertEquals(0, versionMarkers("v1m"), "v1 never reaches the marker, so its histories are unchanged");
+  }
+
+  long versionMarkers(String documentId) {
+    return client.fetchHistory(DocumentRequestWorkflow.workflowId(documentId)).getEvents().stream()
+        .filter(e -> e.hasMarkerRecordedEventAttributes())
+        .count();
   }
 }

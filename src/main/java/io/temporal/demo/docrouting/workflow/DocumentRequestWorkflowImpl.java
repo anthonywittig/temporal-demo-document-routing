@@ -197,8 +197,14 @@ public class DocumentRequestWorkflowImpl implements DocumentRequestWorkflow {
 
   // ---- shared -------------------------------------------------------------------------------
 
+  /**
+   * v2 adds the archive step behind a version marker. A v1 history replayed on v2 code has no
+   * marker here, so getVersion returns DEFAULT_VERSION and the step is skipped: v2 replays every
+   * v1 history. A v1 request moved onto v2 before it gets here records the marker and archives.
+   */
   private RequestOutcome finish(DocumentRequest doc, RoutingDecision route, String detail) {
-    if (settings.archiveDocuments()) {
+    if (settings.archiveDocuments()
+        && Workflow.getVersion("ArchiveDocument", Workflow.DEFAULT_VERSION, 1) == 1) {
       Workflow.upsertTypedSearchAttributes(STEP.valueSet(Steps.ARCHIVE));
       activities.archiveDocument(doc);
     }
