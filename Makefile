@@ -5,7 +5,8 @@
 #
 #   make worker BUILD_ID=v2   # start a second, newer worker version
 #   make promote BUILD_ID=v2  # make v2 current: new requests go to v2
-#   make migrate              # move running requests from v1 to v2 (FROM=v1 BUILD_ID=v2)
+#   make migrate DOC=<id>     # move one running request from v1 to v2 (FROM=v1 BUILD_ID=v2)
+#   make migrate              # move every running request from v1 to v2, as one batch
 #   make stop-systems         # take every mock system down (beat 5's harder outage)
 #   make reset-data           # restore default rules, reference data
 #
@@ -95,28 +96,31 @@ promote:
 	temporal worker deployment set-current-version $(TEMPORAL_FLAGS) \
 		--deployment-name $(DEPLOYMENT) --build-id $(BUILD_ID) --yes
 
-# Pins every running request on FROM to the new version, as one batch with a reason. The new
-# version's code must replay the old histories (see HistoryReplayTest). Requests not moved stay
-# on the version they started on. The batch runs asynchronously, so this waits until no running
-# request matches FROM any more. BUILD_ID means v2 here unless given on the command line.
+# Pins running requests on FROM to the new version. DOC=<document ID> moves that one request (its
+# workflow ID is doc-<document ID>); without DOC, every running request on FROM moves as one batch
+# with a reason. The new version's code must replay the old histories (see HistoryReplayTest).
+# Requests not moved stay on the version they started on. The move reaches visibility a moment
+# later, so this waits until no running request it targeted is still on FROM.
+# BUILD_ID means v2 here unless given on the command line.
 FROM ?= v1
 migrate: MIGRATE_TO = $(if $(filter command line,$(origin BUILD_ID)),$(BUILD_ID),v2)
+migrate: MIGRATE_WF = $(if $(DOC),doc-$(patsubst doc-%,%,$(DOC)))
 migrate:
-	@q='TemporalWorkerDeploymentVersion="$(DEPLOYMENT):$(FROM)" AND ExecutionStatus="Running"'; \
+	@q='TemporalWorkerDeploymentVersion="$(DEPLOYMENT):$(FROM)" AND ExecutionStatus="Running"$(if $(MIGRATE_WF), AND WorkflowId="$(MIGRATE_WF)")'; \
 	n=$$(temporal workflow count $(TEMPORAL_FLAGS) --query "$$q" | awk '/Total:/{print $$2}'); \
-	if [ "$${n:-0}" = 0 ]; then echo "Nothing to migrate: no running requests on $(FROM)"; exit 0; fi; \
+	if [ "$${n:-0}" = 0 ]; then echo "Nothing to migrate: no running $(if $(MIGRATE_WF),request $(MIGRATE_WF),requests) on $(FROM)"; exit 0; fi; \
 	echo "Moving $$n running request(s) from $(FROM) to $(MIGRATE_TO)"; \
-	temporal workflow update-options $(TEMPORAL_FLAGS) --query "$$q" \
+	temporal workflow update-options $(TEMPORAL_FLAGS) \
+		$(if $(MIGRATE_WF),--workflow-id $(MIGRATE_WF),--query "$$q" --reason "Migrate running requests from $(FROM) to $(MIGRATE_TO)" --yes) \
 		--versioning-override-behavior pinned \
 		--versioning-override-deployment-name $(DEPLOYMENT) \
-		--versioning-override-build-id $(MIGRATE_TO) \
-		--reason "Migrate running requests from $(FROM) to $(MIGRATE_TO)" --yes; \
+		--versioning-override-build-id $(MIGRATE_TO) >/dev/null || exit 1; \
 	for i in $$(seq 1 60); do \
 		left=$$(temporal workflow count $(TEMPORAL_FLAGS) --query "$$q" | awk '/Total:/{print $$2}'); \
 		if [ "$${left:-0}" = 0 ]; then echo "Moved $$n request(s) from $(FROM) to $(MIGRATE_TO)"; exit 0; fi; \
 		sleep 1; \
 	done; \
-	echo "The batch is still running; check it with: temporal batch list $(TEMPORAL_FLAGS)"; exit 1
+	echo "Not moved yet; check with: temporal batch list $(TEMPORAL_FLAGS)"; exit 1
 
 build: $(CLASSPATH_FILE)
 	$(MVN) compile

@@ -77,7 +77,7 @@ Thirty-second version: "A document comes in, is classified, and business-unit ru
 | 4. Take the ERP and the worker away | 8 | |
 | 5. The supplier says no; the budget is released | 7 | |
 | 6. Bad data: find, fix, replay in bulk | 10 | |
-| 7. Ship v2 while v1 requests are still open; move one across | 12 | yes: skip steps 7 to 10, and complete the second request on v1 too |
+| 7. Ship v2 while v1 requests are still open; move one across | 12 | yes: skip steps 6, 7 and 10, and both requests finish on v1 |
 | 8. The operations view | 7 | yes, show only two filters |
 | **Total** | **70** | leaves about 20 minutes for questions |
 
@@ -195,16 +195,16 @@ Thirty-second version: "A document comes in, is classified, and business-unit ru
 
 The Services $12,000 request from beat 3 should still be open under **Human tasks**, on worker v1. Call it the first request.
 
-1. Click **Services · invoice · $12,000** again. v1 is still current, so this second request also opens on v1, assigned to Alice. Both rows show version **v1**.
+1. Click **Services · invoice · $12,000** again. v1 is still current, so this second request also opens on v1, assigned to Alice. Both rows show version **v1**, and both wait under **Human tasks**.
 2. In the third terminal: `make worker BUILD_ID=v2`. It starts polling. v1 is still current, so new requests still go to v1.
 3. `make promote BUILD_ID=v2`. It prints "Successfully set the current worker deployment version".
 4. Click **Services · invoice · $3,000**. Its row shows version **v2**. In the Temporal UI, its history ends with an `ArchiveDocument` step that v1 doesn't have.
-5. Under **Human tasks**, click **Complete** on the first $12,000 request. It finishes on v1 code. Its row shows **v1**, and its history has no `ArchiveDocument` step.
-6. Say: "Two versions of the workflow ran side by side. Each request is pinned to the version it started on. Old requests finish on old code, new requests get new code, and nobody had to stop anything. That's the safe default. But sometimes you want an open request on the new code: a hotfix, or a request that will wait for weeks."
-7. In the third terminal: `make migrate`. It prints "Moving 1 running request(s) from v1 to v2" and starts a batch, selected by query like beat 6's reset and carrying a reason. Batches run asynchronously; after a few seconds it prints "Moved 1 request(s) from v1 to v2", and the second request's row switches to **v2**.
-8. Say: "That's a batch operation on running requests. Here it's every request still on v1, but the query could pick one business unit or one document. v2 was written to replay v1 histories, and a test proves it on every build, so moving them is safe. Requests we don't move stay where they are."
-9. Under **Human tasks**, click **Complete** on the second request. It finishes on v2 code. Open it in the Temporal UI: its history ends with a version marker (`MarkerRecorded`) and `ArchiveDocument`. It started on v1, and the step it hadn't reached yet ran on v2's code.
-10. Say: "The marker is how v2 stays compatible. A history from before v2 has no marker at that point, so v2 code replays it without the new step. A request that reaches that point on v2 records the marker and gets the new step. Whether a running request moves is a decision you make per request, per change."
+5. Say: "Two versions of the workflow are running side by side. Each request is pinned to the version it started on, so old requests finish on old code, new requests get new code, and nobody had to stop anything. That's the safe default. But sometimes you want an open request on the new code: a hotfix, or a request that will wait for weeks. That's a decision per request."
+6. Copy the second request's document ID from its row. In the third terminal: `make migrate DOC=<that ID>`. It prints "Moving 1 running request(s) from v1 to v2", then "Moved 1 request(s) from v1 to v2". The second request's row switches to **v2**; the first still shows **v1**. Both are still waiting on Alice.
+7. Say: "Same human task, two requests, now on different code. v2 was written to replay v1 histories, and a test proves it on every build, so moving it is safe. Without `DOC`, `make migrate` moves every running request on v1 as one batch, selected by query like beat 6's reset and carrying a reason, and the query could just as well pick one business unit."
+8. Under **Human tasks**, click **Complete** on the first request. It finishes on v1 code: its row shows **v1**, and its history has no `ArchiveDocument` step.
+9. Click **Complete** on the second request. It finishes on v2 code. Open it in the Temporal UI: its history ends with a version marker (`MarkerRecorded`) and `ArchiveDocument`. It started on v1, and the step it hadn't reached yet ran on v2's code.
+10. Say: "The marker is how v2 stays compatible. A history from before v2 has no marker at that point, so v2 code replays it without the new step. A request that reaches that point on v2 records the marker and gets the new step."
 11. Show v1 draining:
 
     ```sh
@@ -363,13 +363,23 @@ if (settings.archiveDocuments()
 }
 ```
 
-`make migrate` ([`Makefile` lines 98–119](Makefile#L98-L119)) moves every running request on v1 to v2 as one batch, with a reason, and waits until the batch has moved them:
+`make migrate DOC=<document ID>` ([`Makefile` lines 99–123](Makefile#L99-L123)) moves one running request to v2:
+
+```sh
+temporal workflow update-options --workflow-id doc-<document ID> \
+  --versioning-override-behavior pinned --versioning-override-deployment-name document-routing \
+  --versioning-override-build-id v2
+```
+
+Without `DOC`, it moves every running request on v1 as one batch, with a reason:
 
 ```sh
 temporal workflow update-options --query 'TemporalWorkerDeploymentVersion="document-routing:v1" AND ExecutionStatus="Running"' \
   --versioning-override-behavior pinned --versioning-override-deployment-name document-routing \
   --versioning-override-build-id v2 --reason "Migrate running requests from v1 to v2" --yes
 ```
+
+Either way, it waits until the move shows in visibility, so the page's row has switched by the time it prints "Moved".
 
 ### What's demo-only
 
